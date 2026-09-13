@@ -23,6 +23,13 @@ Other [Tailscale repos](https://github.com/orgs/tailscale/repositories) of note:
 For background on which parts of Tailscale are open source and why,
 see [https://tailscale.com/opensource/](https://tailscale.com/opensource/).
 
+## Fork-specific DERP user limits
+
+This public fork adds opt-in, per-process DERP packet policing by authenticated
+user. Read [the feature guide](docs/derper-user-qos.md) before enabling it. Read
+[the approved design](docs/derper-user-qos-plan.md) for its compatibility and
+security boundaries.
+
 ## Using
 
 We serve packages for a variety of distros and platforms at

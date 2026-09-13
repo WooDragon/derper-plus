@@ -180,6 +180,10 @@ type Server struct {
 	meshUpdateLoopCount        *metrics.Histogram
 	bufferedWriteFrames        *metrics.Histogram // how many sendLoop frames (or groups of related frames) get written per flush
 	rateLimitPerClientWaited   expvar.Int         // number of times per-client rate limit caused a wait
+	userRateUploadDropped      expvar.Int         // packets dropped by user upload limits
+	userRateUploadBytes        expvar.Int         // payload bytes dropped by user upload limits
+	userRateDownloadDropped    expvar.Int         // packets dropped by user download limits
+	userRateDownloadBytes      expvar.Int         // payload bytes dropped by user download limits
 	// TODO(illotum): add metrics for rate limited wait time, consider total seconds vs a histogram.
 
 	// verifyClientsLocalTailscaled only accepts client connections to the DERP
@@ -193,6 +197,10 @@ type Server struct {
 	perClientSendQueueDepth int // Sets the client send queue depth for the server.
 	tcpWriteTimeout         time.Duration
 	clock                   tstime.Clock
+
+	// userRate is initialized before accepting clients. Its registry handles
+	// reload publication and allowance synchronization without Server.mu.
+	userRate *userRateRegistry
 
 	mu       syncs.Mutex // guards the following fields
 	closed   bool
@@ -221,6 +229,7 @@ type Server struct {
 	// maps from netip.AddrPort to a client's public key
 	keyOfAddr  map[netip.AddrPort]key.NodePublic
 	rateConfig RateConfig // per-client DERP frame rate limiting config
+
 }
 
 // clientSet represents 1 or more *sclients.
@@ -566,6 +575,22 @@ func (s *Server) LoadAndApplyRateConfig(path string) error {
 	applied := s.UpdateRateLimits(rc)
 	s.logf("rate config applied: client-rate=%d bytes/sec, client-burst=%d bytes",
 		applied.PerClientRateLimitBytesPerSec, applied.PerClientRateBurstBytes)
+	return nil
+}
+
+// LoadAndApplyUserRateConfig reads and atomically applies a per-user packet
+// policer configuration. The first call must happen before accepting clients.
+func (s *Server) LoadAndApplyUserRateConfig(path string) error {
+	config, err := LoadUserRateConfig(path)
+	if err != nil {
+		return err
+	}
+	if s.userRate == nil {
+		s.userRate = newUserRateRegistry(config)
+	} else {
+		s.userRate.apply(config)
+	}
+	s.logf("user rate config applied")
 	return nil
 }
 
@@ -1025,7 +1050,12 @@ func (s *Server) accept(ctx context.Context, nc derp.Conn, brw *bufio.ReadWriter
 	}
 
 	remoteIPPort, _ := netip.ParseAddrPort(remoteAddr)
-	if err := s.verifyClient(ctx, clientKey, clientInfo, remoteIPPort.Addr()); err != nil {
+	subject, err := s.verifyClient(ctx, clientKey, clientInfo, remoteIPPort.Addr())
+	if err != nil {
+		var userRateErr userRateAdmissionError
+		if errors.As(err, &userRateErr) {
+			return fmt.Errorf("client rejected: %v", err)
+		}
 		return fmt.Errorf("client %v rejected: %v", clientKey, err)
 	}
 
@@ -1036,23 +1066,25 @@ func (s *Server) accept(ctx context.Context, nc derp.Conn, brw *bufio.ReadWriter
 	defer cancel()
 
 	c := &sclient{
-		connNum:        connNum,
-		s:              s,
-		key:            clientKey,
-		nc:             nc,
-		br:             br,
-		bw:             bw,
-		logf:           logger.WithPrefix(s.logf, fmt.Sprintf("derp client %v%s: ", remoteAddr, clientKey.ShortString())),
-		ctx:            ctx,
-		remoteIPPort:   remoteIPPort,
-		connectedAt:    s.clock.Now(),
-		sendQueue:      make(chan pkt, s.perClientSendQueueDepth),
-		discoSendQueue: make(chan pkt, s.perClientSendQueueDepth),
-		sendPongCh:     make(chan [8]byte, 1),
-		peerGone:       make(chan peerGoneMsg),
-		canMesh:        s.isMeshPeer(clientInfo),
-		isNotIdealConn: IdealNodeContextKey.Value(ctx) != "",
-		peerGoneLim:    rate.NewLimiter(rate.Every(time.Second), 3),
+		connNum:         connNum,
+		s:               s,
+		key:             clientKey,
+		nc:              nc,
+		br:              br,
+		bw:              bw,
+		logf:            logger.WithPrefix(s.logf, fmt.Sprintf("derp client %v%s: ", remoteAddr, clientKey.ShortString())),
+		ctx:             ctx,
+		remoteIPPort:    remoteIPPort,
+		connectedAt:     s.clock.Now(),
+		sendQueue:       make(chan pkt, s.perClientSendQueueDepth),
+		discoSendQueue:  make(chan pkt, s.perClientSendQueueDepth),
+		sendPongCh:      make(chan [8]byte, 1),
+		peerGone:        make(chan peerGoneMsg),
+		canMesh:         s.isMeshPeer(clientInfo),
+		isNotIdealConn:  IdealNodeContextKey.Value(ctx) != "",
+		peerGoneLim:     rate.NewLimiter(rate.Every(time.Second), 3),
+		userRate:        s.userRate,
+		userRateSubject: subject,
 	}
 
 	if c.canMesh {
@@ -1329,6 +1361,11 @@ func (c *sclient) handleFrameSendPacket(_ derp.FrameType, fl uint32) error {
 	if err != nil {
 		return fmt.Errorf("client %v: recvPacket: %v", c.key, err)
 	}
+	if !c.allowUserRateUpload(len(contents)) {
+		s.userRateUploadDropped.Add(1)
+		s.userRateUploadBytes.Add(int64(len(contents)))
+		return nil
+	}
 
 	dst, fwd, dstLen := c.lookupDest(dstKey)
 
@@ -1361,6 +1398,14 @@ func (c *sclient) handleFrameSendPacket(_ derp.FrameType, fl uint32) error {
 		src:        c.key,
 	}
 	return c.sendPkt(dst, p)
+}
+
+func (c *sclient) allowUserRateUpload(size int) bool {
+	return c.userRate == nil || c.userRate.allowUpload(c.userRateSubject, size)
+}
+
+func (c *sclient) allowUserRateDownload(size int) bool {
+	return c.userRate == nil || c.userRate.allowDownload(c.userRateSubject, size)
 }
 
 // setRateLimit updates the receive rate limiter. When bytesPerSec is 0, or the
@@ -1576,29 +1621,54 @@ func (s *Server) isMeshPeer(info *derp.ClientInfo) bool {
 	return s.meshKey.Equal(info.MeshKey)
 }
 
+// userRateAdmissionError marks rejections which must not be wrapped with a
+// client public key in the accept path.
+type userRateAdmissionError string
+
+func (err userRateAdmissionError) Error() string { return string(err) }
+
 // verifyClient checks whether the client is allowed to connect to the derper,
 // depending on how & whether the server's been configured to verify.
-func (s *Server) verifyClient(ctx context.Context, clientKey key.NodePublic, info *derp.ClientInfo, clientIP netip.Addr) error {
+func (s *Server) verifyClient(ctx context.Context, clientKey key.NodePublic, info *derp.ClientInfo, clientIP netip.Addr) (userRateSubject, error) {
 	if s.isMeshPeer(info) {
+		if s.userRate != nil {
+			return userRateSubject{}, userRateAdmissionError("user rate limits do not support mesh peers")
+		}
 		// Trusted mesh peer. No need to verify further. In fact, verifying
 		// further wouldn't work: it's not part of the tailnet so tailscaled and
 		// likely the admission control URL wouldn't know about it.
-		return nil
+		return userRateSubject{}, nil
 	}
 
+	var subject userRateSubject
 	// tailscaled-based verification:
 	if s.verifyClientsLocalTailscaled {
-		_, err := s.localClient.WhoIsNodeKey(ctx, clientKey)
+		whois, err := s.localClient.WhoIsNodeKey(ctx, clientKey)
 		if err == local.ErrPeerNotFound {
-			return fmt.Errorf("peer %v not authorized (not found in local tailscaled)", clientKey)
+			return userRateSubject{}, fmt.Errorf("peer %v not authorized (not found in local tailscaled)", clientKey)
 		}
 		if err != nil {
 			if strings.Contains(err.Error(), "invalid 'addr' parameter") {
 				// Issue 12617
-				return errors.New("tailscaled version is too old (out of sync with derper binary)")
+				return userRateSubject{}, errors.New("tailscaled version is too old (out of sync with derper binary)")
 			}
-			return fmt.Errorf("failed to query local tailscaled status for %v: %w", clientKey, err)
+			return userRateSubject{}, fmt.Errorf("failed to query local tailscaled status for %v: %w", clientKey, err)
 		}
+		if s.userRate != nil {
+			if whois.Node == nil || whois.UserProfile == nil {
+				return userRateSubject{}, userRateAdmissionError("user rate limits require a complete local identity")
+			}
+			if whois.Node.IsTagged() {
+				subject.tagged = true
+			} else if whois.UserProfile.ID > 0 {
+				subject.userID = whois.UserProfile.ID
+			} else {
+				return userRateSubject{}, userRateAdmissionError("user rate limits require a positive user ID")
+			}
+		}
+	}
+	if s.userRate != nil && !subject.tagged && subject.userID <= 0 {
+		return userRateSubject{}, userRateAdmissionError("user rate limits require a positive user ID")
 	}
 
 	// admission controller-based verification:
@@ -1611,34 +1681,33 @@ func (s *Server) verifyClient(ctx context.Context, clientKey key.NodePublic, inf
 			Source:     clientIP,
 		})
 		if err != nil {
-			return err
+			return userRateSubject{}, err
 		}
 		req, err := http.NewRequestWithContext(ctx, "POST", s.verifyClientsURL, bytes.NewReader(jreq))
 		if err != nil {
-			return err
+			return userRateSubject{}, err
 		}
 		res, err := http.DefaultClient.Do(req)
 		if err != nil {
 			if s.verifyClientsURLFailOpen {
 				s.logf("admission controller unreachable; allowing client %v", clientKey)
-				return nil
+				return subject, nil
 			}
-			return err
+			return userRateSubject{}, err
 		}
 		defer res.Body.Close()
 		if res.StatusCode != 200 {
-			return fmt.Errorf("admission controller: %v", res.Status)
+			return userRateSubject{}, fmt.Errorf("admission controller: %v", res.Status)
 		}
 		var jres tailcfg.DERPAdmitClientResponse
 		if err := json.NewDecoder(io.LimitReader(res.Body, 4<<10)).Decode(&jres); err != nil {
-			return err
+			return userRateSubject{}, err
 		}
 		if !jres.Allow {
-			return fmt.Errorf("admission controller: %v/%v not allowed", clientKey, clientIP)
+			return userRateSubject{}, fmt.Errorf("admission controller: %v/%v not allowed", clientKey, clientIP)
 		}
-		// TODO(bradfitz): add policy for configurable bandwidth rate per client?
 	}
-	return nil
+	return subject, nil
 }
 
 func (s *Server) sendServerKey(lw *lazyBufioWriter) error {
@@ -1822,24 +1891,26 @@ func (s *Server) recvForwardPacket(br *bufio.Reader, frameLen uint32) (srcKey, d
 // (The "s" prefix is to more explicitly distinguish it from Client in derp_client.go)
 type sclient struct {
 	// Static after construction.
-	connNum        int64 // process-wide unique counter, incremented each Accept
-	s              *Server
-	nc             derp.Conn
-	key            key.NodePublic
-	info           derp.ClientInfo
-	logf           logger.Logf
-	ctx            context.Context  // closed when connection closes
-	remoteIPPort   netip.AddrPort   // zero if remoteAddr is not ip:port.
-	sendQueue      chan pkt         // packets queued to this client; never closed
-	discoSendQueue chan pkt         // important packets queued to this client; never closed
-	sendPongCh     chan [8]byte     // pong replies to send to the client; never closed
-	peerGone       chan peerGoneMsg // write request that a peer is not at this server (not used by mesh peers)
-	meshUpdate     chan struct{}    // write request to write peerStateChange
-	canMesh        bool             // clientInfo had correct mesh token for inter-region routing
-	isNotIdealConn bool             // client indicated it is not its ideal node in the region
-	isDup          atomic.Bool      // whether more than 1 sclient for key is connected
-	isDisabled     atomic.Bool      // whether sends to this peer are disabled due to active/active dups
-	debug          bool             // turn on for verbose logging
+	connNum         int64 // process-wide unique counter, incremented each Accept
+	s               *Server
+	nc              derp.Conn
+	key             key.NodePublic
+	info            derp.ClientInfo
+	logf            logger.Logf
+	ctx             context.Context   // closed when connection closes
+	remoteIPPort    netip.AddrPort    // zero if remoteAddr is not ip:port.
+	sendQueue       chan pkt          // packets queued to this client; never closed
+	discoSendQueue  chan pkt          // important packets queued to this client; never closed
+	sendPongCh      chan [8]byte      // pong replies to send to the client; never closed
+	peerGone        chan peerGoneMsg  // write request that a peer is not at this server (not used by mesh peers)
+	meshUpdate      chan struct{}     // write request to write peerStateChange
+	canMesh         bool              // clientInfo had correct mesh token for inter-region routing
+	isNotIdealConn  bool              // client indicated it is not its ideal node in the region
+	userRate        *userRateRegistry // nil unless per-user policing is enabled
+	userRateSubject userRateSubject   // connection-time identity for per-user policing
+	isDup           atomic.Bool       // whether more than 1 sclient for key is connected
+	isDisabled      atomic.Bool       // whether sends to this peer are disabled due to active/active dups
+	debug           bool              // turn on for verbose logging
 
 	// Owned by run, not thread-safe.
 	br          *bufio.Reader
@@ -2207,6 +2278,11 @@ func (c *sclient) sendMeshUpdates() error {
 // returns, do not retain slices.
 // It does not flush its bufio.Writer.
 func (c *sclient) sendPacket(srcKey key.NodePublic, contents []byte) (err error) {
+	if !c.allowUserRateDownload(len(contents)) {
+		c.s.userRateDownloadDropped.Add(1)
+		c.s.userRateDownloadBytes.Add(int64(len(contents)))
+		return nil
+	}
 	defer func() {
 		// Stats update.
 		if err != nil {
@@ -2473,6 +2549,12 @@ func (s *Server) ExpVar(rateLimitEnabled bool) expvar.Var {
 		}))
 		m.Set("rate_limit_per_client_waited", &s.rateLimitPerClientWaited)
 	}
+	if s.userRate != nil {
+		m.Set("user_rate_upload_dropped", &s.userRateUploadDropped)
+		m.Set("user_rate_upload_bytes", &s.userRateUploadBytes)
+		m.Set("user_rate_download_dropped", &s.userRateDownloadDropped)
+		m.Set("user_rate_download_bytes", &s.userRateDownloadBytes)
+	}
 	return m
 }
 
@@ -2534,7 +2616,7 @@ func (s *Server) checkVerifyClientsLocalTailscaled() error {
 		IsProber: true,
 	}
 	clientIP := netip.IPv6Loopback()
-	if err := s.verifyClient(ctx, status.Self.PublicKey, info, clientIP); err != nil {
+	if _, err := s.verifyClient(ctx, status.Self.PublicKey, info, clientIP); err != nil {
 		return fmt.Errorf("verifyClient for self nodekey: %w", err)
 	}
 	return nil
