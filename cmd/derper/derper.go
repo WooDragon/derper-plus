@@ -88,7 +88,8 @@ var (
 	acceptConnLimit = flag.Float64("accept-connection-limit", math.Inf(+1), "rate limit for accepting new connection")
 	acceptConnBurst = flag.Int("accept-connection-burst", math.MaxInt, "burst limit for accepting new connection")
 
-	rateConfigPath = flag.String("rate-config", "", "if non-empty, path to JSON rate limit config file. Rate limiting is experimental and subject to change. Configuration is reloaded on SIGHUP.")
+	rateConfigPath     = flag.String("rate-config", "", "if non-empty, path to JSON rate limit config file. Rate limiting is experimental and subject to change. Configuration is reloaded on SIGHUP.")
+	userRateConfigPath = flag.String("user-rate-config", "", "if non-empty, path to strict JSON per-user packet policing config. Requires --verify-clients=true, disables mesh, and reloads on SIGHUP.")
 
 	// tcpKeepAlive is intentionally long, to reduce battery cost. There is an L7 keepalive on a higher frequency schedule.
 	tcpKeepAlive = flag.Duration("tcp-keepalive-time", 10*time.Minute, "TCP keepalive time")
@@ -195,7 +196,18 @@ func main() {
 	s.SetVerifyClientURL(*verifyClientURL)
 	s.SetVerifyClientURLFailOpen(*verifyFailOpen)
 	s.SetTCPWriteTimeout(*tcpWriteTimeout)
-	if *rateConfigPath != "" {
+	if *userRateConfigPath != "" {
+		if !*verifyClients {
+			log.Fatal("derper: --user-rate-config requires --verify-clients=true")
+		}
+		if *rateConfigPath != "" {
+			log.Fatal("derper: --user-rate-config and --rate-config cannot be used together")
+		}
+		if err := s.LoadAndApplyUserRateConfig(*userRateConfigPath); err != nil {
+			log.Fatalf("derper: loading user rate config: %v", err)
+		}
+		go watchUserRateConfig(ctx, s, *userRateConfigPath)
+	} else if *rateConfigPath != "" {
 		if err := s.LoadAndApplyRateConfig(*rateConfigPath); err != nil {
 			log.Fatalf("derper: loading rate config: %v", err)
 		}
@@ -250,10 +262,13 @@ func main() {
 		log.Println("DERP mesh key configured")
 	}
 
+	if *userRateConfigPath != "" && (*meshWith != "" || s.HasMeshKey()) {
+		log.Fatal("derper: --user-rate-config does not support mesh")
+	}
 	if err := startMesh(s); err != nil {
 		log.Fatalf("startMesh: %v", err)
 	}
-	expvar.Publish("derp", s.ExpVar(*rateConfigPath != ""))
+	expvar.Publish("derp", s.ExpVar(*rateConfigPath != "" || *userRateConfigPath != ""))
 
 	handleHome, ok := getHomeHandler(*flagHome)
 	if !ok {
@@ -444,6 +459,27 @@ func watchRateConfig(ctx context.Context, s *derpserver.Server, path string) {
 				continue
 			}
 			log.Printf("derper: rate config reloaded successfully")
+		}
+	}
+}
+
+// watchUserRateConfig listens for SIGHUP signals and reloads the per-user rate
+// config file on each signal. It returns when ctx is done.
+func watchUserRateConfig(ctx context.Context, s *derpserver.Server, path string) {
+	sighup := make(chan os.Signal, 1)
+	signal.Notify(sighup, syscall.SIGHUP)
+	defer signal.Stop(sighup)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-sighup:
+			log.Printf("derper: received SIGHUP, reloading user rate config from %s", path)
+			if err := s.LoadAndApplyUserRateConfig(path); err != nil {
+				log.Printf("derper: user rate config reload failed: %v", err)
+				continue
+			}
+			log.Printf("derper: user rate config reloaded successfully")
 		}
 	}
 }
