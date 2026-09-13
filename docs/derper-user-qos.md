@@ -68,8 +68,9 @@ this repository.
 
 `users` keys must be canonical positive decimal user IDs. Leading zeros,
 negative values, zero, overflow, and partial policies are rejected. `burst_bytes`
-is optional. Omission or zero selects `derp.MaxPacketSize`. A positive burst
-below that packet size, or a burst that does not fit Go's `int`, is rejected.
+is optional. Omission or zero selects `derp.MaxPacketSize`. An explicit `null`,
+a positive burst below that packet size, or a burst that does not fit Go's `int`,
+is rejected.
 
 The optional `tagged` policy controls every tagged device through one separate
 bucket pair. If it is absent, tagged devices use `default`. Tagged nodes do not

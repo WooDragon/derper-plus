@@ -34,9 +34,9 @@ type userRateConfig struct {
 }
 
 type rawUserRatePolicy struct {
-	UploadBytesPerSecond   *uint64 `json:"upload_bytes_per_second"`
-	DownloadBytesPerSecond *uint64 `json:"download_bytes_per_second"`
-	BurstBytes             *uint64 `json:"burst_bytes"`
+	UploadBytesPerSecond   *uint64         `json:"upload_bytes_per_second"`
+	DownloadBytesPerSecond *uint64         `json:"download_bytes_per_second"`
+	BurstBytes             json.RawMessage `json:"burst_bytes"`
 }
 
 type rawUserRateConfig struct {
@@ -124,7 +124,12 @@ func (raw rawUserRatePolicy) normalize(name string) (userRatePolicy, error) {
 	}
 	burst := uint64(derp.MaxPacketSize)
 	if raw.BurstBytes != nil {
-		burst = *raw.BurstBytes
+		if bytes.Equal(bytes.TrimSpace(raw.BurstBytes), []byte("null")) {
+			return userRatePolicy{}, fmt.Errorf("user rate policy %q burst must not be null", name)
+		}
+		if err := json.Unmarshal(raw.BurstBytes, &burst); err != nil {
+			return userRatePolicy{}, fmt.Errorf("user rate policy %q has an invalid burst: %w", name, err)
+		}
 	}
 	if burst != 0 && burst < derp.MaxPacketSize {
 		return userRatePolicy{}, fmt.Errorf("user rate policy %q burst is below the maximum packet size", name)

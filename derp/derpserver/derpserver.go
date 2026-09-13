@@ -198,6 +198,10 @@ type Server struct {
 	tcpWriteTimeout         time.Duration
 	clock                   tstime.Clock
 
+	// userRate is initialized before accepting clients. Its registry handles
+	// reload publication and allowance synchronization without Server.mu.
+	userRate *userRateRegistry
+
 	mu       syncs.Mutex // guards the following fields
 	closed   bool
 	netConns map[derp.Conn]chan struct{} // chan is closed when conn closes
@@ -226,9 +230,6 @@ type Server struct {
 	keyOfAddr  map[netip.AddrPort]key.NodePublic
 	rateConfig RateConfig // per-client DERP frame rate limiting config
 
-	// userRate is configured before the server accepts clients and then only
-	// publishes complete reloads through its own lock.
-	userRate *userRateRegistry
 }
 
 // clientSet represents 1 or more *sclients.
@@ -1666,6 +1667,9 @@ func (s *Server) verifyClient(ctx context.Context, clientKey key.NodePublic, inf
 			}
 		}
 	}
+	if s.userRate != nil && !subject.tagged && subject.userID <= 0 {
+		return userRateSubject{}, userRateAdmissionError("user rate limits require a positive user ID")
+	}
 
 	// admission controller-based verification:
 	if s.verifyClientsURL != "" {
@@ -2544,6 +2548,8 @@ func (s *Server) ExpVar(rateLimitEnabled bool) expvar.Var {
 			return s.rateConfig.PerClientRateBurstBytes
 		}))
 		m.Set("rate_limit_per_client_waited", &s.rateLimitPerClientWaited)
+	}
+	if s.userRate != nil {
 		m.Set("user_rate_upload_dropped", &s.userRateUploadDropped)
 		m.Set("user_rate_upload_bytes", &s.userRateUploadBytes)
 		m.Set("user_rate_download_dropped", &s.userRateDownloadDropped)

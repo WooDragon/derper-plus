@@ -268,7 +268,7 @@ func main() {
 	if err := startMesh(s); err != nil {
 		log.Fatalf("startMesh: %v", err)
 	}
-	expvar.Publish("derp", s.ExpVar(*rateConfigPath != "" || *userRateConfigPath != ""))
+	expvar.Publish("derp", s.ExpVar(*rateConfigPath != ""))
 
 	handleHome, ok := getHomeHandler(*flagHome)
 	if !ok {
