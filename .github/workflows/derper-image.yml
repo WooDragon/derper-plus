@@ -66,8 +66,12 @@ jobs:
           stable_head="$(git rev-parse refs/remotes/origin/stable)"
           checkout_head="$(git rev-parse HEAD)"
 
-          if [ "$checkout_head" != "$EVENT_SHA" ]; then
-            echo "checked-out revision does not match the event SHA" >&2
+          if ! event_commit="$(git rev-parse "${EVENT_SHA}^{commit}")"; then
+            echo "event SHA does not resolve to a commit" >&2
+            exit 1
+          fi
+          if [ "$checkout_head" != "$event_commit" ]; then
+            echo "checked-out revision does not match the event commit" >&2
             exit 1
           fi
 
@@ -127,11 +131,9 @@ jobs:
       - name: Record immutable image digest
         if: steps.validate.outputs.publish == 'true'
         env:
+          SOURCE_REVISION: ${{ steps.source.outputs.revision }}
           DIGEST: ${{ steps.push.outputs.digest }}
         run: |
-          {
-            echo "## Published derper image"
-            echo
-            echo "- Source revision: \\`${{ steps.source.outputs.revision }}\\`"
-            echo "- Digest: \\`$DIGEST\\`"
-          } >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' '## Published derper image' '' >> "$GITHUB_STEP_SUMMARY"
+          printf -- '- Source revision: `%s`\n- Digest: `%s`\n' \
+            "$SOURCE_REVISION" "$DIGEST" >> "$GITHUB_STEP_SUMMARY"

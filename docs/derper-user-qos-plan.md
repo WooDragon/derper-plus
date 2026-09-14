@@ -13,8 +13,11 @@ This public fork adds opt-in, single-process bandwidth limits to the official DE
 > **Historical delivery note**: This plan originally recorded a repository with
 > GitHub Actions disabled. That historical condition has been superseded by the
 > dedicated build-only container CI documented in
-> [derper-container.md](derper-container.md). The CI does not run tests or
-> establish QoS runtime acceptance.
+> [derper-container.md](derper-container.md). The fork delivery workflow does
+> not run tests or establish QoS runtime acceptance. Inherited upstream workflows
+> must remain disabled. Before an administrator enables repository Actions, the
+> administrator must first disable every inherited workflow individually and
+> verify each disabled state.
 
 ## Required behavior
 

@@ -12,7 +12,10 @@ contain configuration, identities, credentials, `tailscaled`, a shell, or an
 entrypoint wrapper. The process runs as root by default because DERP can use low
 ports and a privileged local Tailscale socket. Operators may configure another
 user only when that user can write every required state path and access the
-chosen socket.
+chosen socket. If an operator selects a non-root user, the operator must pass
+`-c=/var/lib/derper/derper.key` or another explicit key path. That user must be
+able to write the selected key, state, and certificate paths. That user must
+also have permission to bind the selected ports and access the socket.
 
 A successful build or publish does not prove that the package is public. The
 first GHCR publication can require a package administrator to change visibility
@@ -25,7 +28,11 @@ Do not claim anonymous availability until an anonymous pull has succeeded.
 Pull requests to `stable` build both target platforms without registry login or
 publication. Only a `stable` push or a manual dispatch from `stable` can publish
 `edge` and `sha-<full-commit-sha>`. A release tag must match
-`v<upstream-version>-plus.<revision>`, for example `v1.102.4-plus.1`.
+`v<upstream-version>-plus.<revision>`, for example `v1.102.4-plus.1`. The fork
+delivery workflow does not run tests. Inherited upstream workflows must remain
+disabled. Before an administrator enables repository Actions, the administrator
+must first disable every inherited workflow individually and verify each disabled
+state.
 
 The publication workflow verifies that a release commit is reachable from
 `origin/stable` before it logs in to GHCR. A stale `stable` event skips
