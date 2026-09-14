@@ -5,10 +5,19 @@
 This public fork adds opt-in, single-process bandwidth limits to the official DERP server. It does not change the Tailscale control plane, clients, or tailnet ACL semantics.
 
 - Upstream baseline: `v1.102.4`, commit `bbcd7d1fc2054b9189ebc1531acf74bd880ca0c8`.
-- Fork: `WooDragon/derper-user-qos`.
-- `main` retains the upstream development line. The fork default branch, `qos`, starts at the stable baseline. Feature PRs target `qos`, never the upstream repository.
+- Fork: `WooDragon/derper-plus`.
+- `main` retains the upstream development line. `stable` is the fork release branch. Feature PRs target `stable`, never the upstream repository.
 - Go requirement: `1.26.6`. Use the Go toolchain mechanism for this repository; do not upgrade the host installation as part of this change.
-- This delivery does not deploy a server. At the user's request, it does not add or execute tests. Formatting, compilation, diff inspection, and focused review remain in scope. GitHub Actions is disabled for this initial delivery.
+- This QoS delivery does not deploy a server. At the user's request, it does not add or execute tests. Formatting, compilation, diff inspection, and focused review remain in scope.
+
+> **Historical delivery note**: This plan originally recorded a repository with
+> GitHub Actions disabled. That historical condition has been superseded by the
+> dedicated build-only container CI documented in
+> [derper-container.md](derper-container.md). The fork delivery workflow does
+> not run tests or establish QoS runtime acceptance. Inherited upstream workflows
+> must remain disabled. Before an administrator enables repository Actions, the
+> administrator must first disable every inherited workflow individually and
+> verify each disabled state.
 
 ## Required behavior
 
@@ -114,8 +123,13 @@ No dependency changes are expected. Keep the module path and upstream license in
 3. A `dev` agent implements the approved plan, using existing source idioms. It does not start reviews, deploy, or change the agreed verification scope.
 4. Perform formatting checks and native plus Linux/amd64 compilation of `cmd/derper` with the repository's required toolchain. Build artifacts stay outside tracked source. Do not execute `go test`, race tests, benchmarks, integration tests, or runtime traffic probes.
 5. Track the feature in an Issue on this fork. Commits use the upstream directory-prefix style, an internal `Updates #N` reference, `Change-Id`, and DCO sign-off. Never create an Issue or PR on the upstream repository.
-6. Open a PR from `feat/user-bandwidth-limits` to `qos`. Run the user-requested `pr-review` through the main conversation. Apply only accepted findings and repeat focused follow-up until no accepted findings remain. Do not amend or force-push review iterations.
-7. Merge through the fork PR, not a local merge to the default branch. Verify the remote merge state. Record that compilation/review are not functional or production acceptance.
+6. Open a PR from `feat/user-bandwidth-limits` to `stable`. Run the requested
+   review through the main conversation. Apply only accepted findings and repeat
+   focused follow-up until no accepted findings remain. Do not amend or
+   force-push review iterations.
+7. Merge through the fork PR, not a local merge to the default branch. Verify
+   the remote merge state. Record that compilation and review are not functional
+   or production acceptance.
 
 ## Deferred validation and deployment
 

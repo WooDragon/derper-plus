@@ -1,0 +1,23 @@
+# This file applies only when building with cmd/derper/Dockerfile.
+# Keep the Go module and source tree available for package embeds.
+.git
+.github
+
+# Local credentials and configuration are never build inputs.
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+*.secret
+secrets/
+
+# Local build and coverage output do not belong in the build context.
+bin/
+dist/
+out/
+tmp/
+coverage/
+*.coverprofile
+cmd/derper/derper
