@@ -1,5 +1,9 @@
 # DERP per-user bandwidth limits
 
+`main` remains the upstream development line. `stable` is the fork release
+branch. Read [the container delivery guide](derper-container.md) for the
+build-only image path and its separate verification limits.
+
 This fork adds an opt-in packet policer to `cmd/derper`. It applies a shared
 upload bucket and a shared download bucket to each authenticated user within
 one DERP server process. It does not modify Tailscale clients, ACLs, or the

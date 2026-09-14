@@ -23,6 +23,18 @@ Other [Tailscale repos](https://github.com/orgs/tailscale/repositories) of note:
 For background on which parts of Tailscale are open source and why,
 see [https://tailscale.com/opensource/](https://tailscale.com/opensource/).
 
+## derper-plus fork delivery
+
+`derper-plus` keeps `main` as the upstream development line. `stable` is the
+fork release branch. Feature and delivery pull requests target `stable`; do not
+merge fork changes directly into `main`.
+
+This fork provides the planned multi-platform DERP image at
+`ghcr.io/woodragon/derper-plus`. Read [the container delivery guide](docs/derper-container.md)
+for publication rules, image usage, persistence, rollback, and verification
+limits. The documented reference does not claim that a package is public or
+runtime-verified.
+
 ## Fork-specific DERP user limits
 
 This public fork adds opt-in, per-process DERP packet policing by authenticated
