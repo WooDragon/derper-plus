@@ -2,7 +2,7 @@
 
 `main` remains the upstream development line. `stable` is the fork release
 branch. Read [the container delivery guide](derper-container.md) for the
-build-only image path and its separate verification limits.
+published container images and their separate runtime verification limits.
 
 This fork adds an opt-in packet policer to `cmd/derper`. It applies a shared
 upload bucket and a shared download bucket to each authenticated user within
@@ -11,10 +11,15 @@ control plane.
 
 ## Scope and limits
 
-The policer counts DERP packet payload bytes after DERP accepts a packet for
-forwarding. It includes encrypted discovery payloads. It does not count TCP,
-TLS, DERP frame headers, or control frames. Therefore, it does not cap bytes
-already received by the network interface and is not a billed-wire-byte limit.
+The server charges upload allowance after it fully reads a DERP packet payload
+and before it looks up the destination or forwards the packet. An unknown
+destination can therefore consume the sender's allowance. The server checks
+download allowance before it writes a packet frame to the destination client.
+
+The policer counts DERP packet payload bytes, including encrypted discovery
+payloads. It does not count TCP, TLS, DERP frame headers, or control frames.
+Therefore, it does not cap bytes already received by the network interface and
+is not a billed-wire-byte limit.
 
 Each direction has an independent token bucket. A bucket permits its configured
 burst before applying its sustained rate. A packet that exceeds the available
@@ -28,8 +33,18 @@ transfer between two devices owned by the same user consumes both directions of
 the same pair. The implementation does not guarantee fair sharing among a
 user's devices.
 
-These limits are per process. They do not coordinate across DERP instances and
-do not apply to direct P2P traffic.
+These limits are per process. They do not coordinate across DERP instances.
+They apply only to DERP payloads in this `derper` process, including payloads
+whose inner traffic is TCP or UDP. They do not apply to direct P2P traffic.
+STUN is a connectivity probe, not a business relay path.
+
+[Peer Relay](https://tailscale.com/docs/features/peer-relay) is an official
+Tailscale feature with a separate UDP relay path. It does not invoke this
+policer. This derper process is not a Peer Relay server. Native DERP clients use
+TCP/TLS and an HTTP/1 Upgrade. This fork does not implement HTTP/3 or QUIC for
+DERP. Enabling HTTP/3 in an external Caddy listener does not change the DERP
+client path. See Tailscale's [connection type reference](https://tailscale.com/docs/reference/connection-types)
+for the distinction between direct, DERP, STUN, and relay paths.
 
 ## Configuration
 
@@ -101,9 +116,11 @@ with a partial policy.
 
 Send `SIGHUP` to reload the same configuration path. The server validates the
 entire replacement before publishing it. A failed reload logs a non-sensitive
-error and retains the previous policy. A successful reload updates existing
-bucket objects without restoring their burst allowance. Existing and new
-connections use the new policies after the reload completes.
+error and retains the previous policy. For an existing nonzero directional
+limiter, a successful reload updates that limiter in place without rebuilding
+it. A transition from zero (unlimited) to a nonzero rate creates a new limiter,
+which receives its initial configured burst. Existing and new connections use
+the new policies after the reload completes.
 
 To roll back, remove `--user-rate-config`, restore any intended upstream mesh or
 `--rate-config` settings, and restart the process. The mode is selected at
@@ -119,6 +136,12 @@ later ownership or tag change takes effect only after the device reconnects.
 Unknown, incomplete, or non-positive user identity data fails closed. When this
 feature is disabled, the upstream verification and admission log behavior is
 unchanged.
+
+## Future direction
+
+[Issue #5](https://github.com/WooDragon/derper-plus/issues/5) proposes a future
+policy input that maps `grants.app` data through `WhoIsResponse.CapMap`. It is
+not implemented. The current policer accepts only local JSON configuration.
 
 ## Deferred operator validation
 

@@ -11,5 +11,5 @@ unchanged unless a documented fork-specific contract requires a change.
 
 Before changing container delivery, read
 [the container delivery guide](docs/derper-container.md). Before changing
-per-user DERP policing, read [the feature guide](docs/derper-user-qos.md) and
-[the approved design](docs/derper-user-qos-plan.md).
+per-user DERP policing, read [the feature guide](docs/derper-user-qos.md). The
+guide also links the separate future-policy proposal.
