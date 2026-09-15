@@ -62,6 +62,11 @@ Add `--user-rate-config=<path>` to `cmd/derper`. The file is strict JSON. A repr
 
 The new mode requires `--verify-clients=true`. Reject combinations with the old `--rate-config`, which would otherwise also limit exempt users. The first version does not support mesh in user-limit mode. At startup, reject all effective mesh settings after flag defaults and key discovery have been resolved, including an automatically discovered `/home/derp/keys/derp-mesh.key`, not just explicitly supplied flags. Reject authenticated mesh peers when the mode is active as a second boundary. The unmodified mode retains mesh support.
 
+> **Superseded**: The mesh restriction described above was removed by
+> [issue #7](https://github.com/WooDragon/derper-plus/issues/7). Mesh is now
+> supported, with mesh peers exempt from the policer. The current behavior is
+> documented in [derper-user-qos.md](derper-user-qos.md).
+
 ## Implementation approach
 
 ### 1. Preserve authenticated identity
