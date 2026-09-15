@@ -1400,12 +1400,16 @@ func (c *sclient) handleFrameSendPacket(_ derp.FrameType, fl uint32) error {
 	return c.sendPkt(dst, p)
 }
 
+// allowUserRateUpload and allowUserRateDownload report whether a payload of
+// size bytes fits the connection's per-user allowance. Mesh peers are exempt:
+// forwarded traffic was already policed at the relay where the sending user is
+// authenticated, and a mesh peer has no resolvable user identity to charge.
 func (c *sclient) allowUserRateUpload(size int) bool {
-	return c.userRate == nil || c.userRate.allowUpload(c.userRateSubject, size)
+	return c.canMesh || c.userRate == nil || c.userRate.allowUpload(c.userRateSubject, size)
 }
 
 func (c *sclient) allowUserRateDownload(size int) bool {
-	return c.userRate == nil || c.userRate.allowDownload(c.userRateSubject, size)
+	return c.canMesh || c.userRate == nil || c.userRate.allowDownload(c.userRateSubject, size)
 }
 
 // setRateLimit updates the receive rate limiter. When bytesPerSec is 0, or the
@@ -1631,12 +1635,13 @@ func (err userRateAdmissionError) Error() string { return string(err) }
 // depending on how & whether the server's been configured to verify.
 func (s *Server) verifyClient(ctx context.Context, clientKey key.NodePublic, info *derp.ClientInfo, clientIP netip.Addr) (userRateSubject, error) {
 	if s.isMeshPeer(info) {
-		if s.userRate != nil {
-			return userRateSubject{}, userRateAdmissionError("user rate limits do not support mesh peers")
-		}
 		// Trusted mesh peer. No need to verify further. In fact, verifying
 		// further wouldn't work: it's not part of the tailnet so tailscaled and
 		// likely the admission control URL wouldn't know about it.
+		//
+		// The zero subject returned here never reaches the per-user policer:
+		// [sclient.allowUserRateUpload] and [sclient.allowUserRateDownload]
+		// short-circuit on canMesh.
 		return userRateSubject{}, nil
 	}
 

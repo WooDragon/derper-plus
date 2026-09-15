@@ -89,7 +89,7 @@ var (
 	acceptConnBurst = flag.Int("accept-connection-burst", math.MaxInt, "burst limit for accepting new connection")
 
 	rateConfigPath     = flag.String("rate-config", "", "if non-empty, path to JSON rate limit config file. Rate limiting is experimental and subject to change. Configuration is reloaded on SIGHUP.")
-	userRateConfigPath = flag.String("user-rate-config", "", "if non-empty, path to strict JSON per-user packet policing config. Requires --verify-clients=true, disables mesh, and reloads on SIGHUP.")
+	userRateConfigPath = flag.String("user-rate-config", "", "if non-empty, path to strict JSON per-user packet policing config. Requires --verify-clients=true, exempts mesh peers from policing, and reloads on SIGHUP.")
 
 	// tcpKeepAlive is intentionally long, to reduce battery cost. There is an L7 keepalive on a higher frequency schedule.
 	tcpKeepAlive = flag.Duration("tcp-keepalive-time", 10*time.Minute, "TCP keepalive time")
@@ -262,9 +262,6 @@ func main() {
 		log.Println("DERP mesh key configured")
 	}
 
-	if *userRateConfigPath != "" && (*meshWith != "" || s.HasMeshKey()) {
-		log.Fatal("derper: --user-rate-config does not support mesh")
-	}
 	if err := startMesh(s); err != nil {
 		log.Fatalf("startMesh: %v", err)
 	}

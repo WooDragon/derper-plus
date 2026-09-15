@@ -38,6 +38,17 @@ They apply only to DERP payloads in this `derper` process, including payloads
 whose inner traffic is TCP or UDP. They do not apply to direct P2P traffic.
 STUN is a connectivity probe, not a business relay path.
 
+Mesh peers are exempt from this policer. A relay polices the clients whose
+identity it can resolve from its own authenticated local Tailscale state. A
+mesh peer is not a tailnet member and has no resolvable user identity. Traffic
+therefore gets policed once, at the relay where the sending user is connected.
+A user connected to relay A is policed by A. Traffic that reaches mesh peer B
+over the mesh is not policed by B, even for a user B would police on a direct
+connection. A user's allowance applies only at the relay the user is connected
+to, so a user can reach a destination behind B without B applying its own
+allowance. This is the intended behavior for ingress policing and is
+consistent with the per-process scope already stated above.
+
 [Peer Relay](https://tailscale.com/docs/features/peer-relay) is an official
 Tailscale feature with a separate UDP relay path. It does not invoke this
 policer. This derper process is not a Peer Relay server. Native DERP clients use
@@ -50,9 +61,8 @@ for the distinction between direct, DERP, STUN, and relay paths.
 
 Enable the feature with `--user-rate-config=<path>`. The feature requires
 `--verify-clients=true` because the server obtains the connection identity from
-its local authenticated Tailscale state. It rejects `--rate-config` and all
-mesh configurations, including a mesh key discovered from the default mesh-key
-path.
+its local authenticated Tailscale state. It rejects `--rate-config` and permits
+mesh configurations because mesh peers are exempt from this policer.
 
 The file is strict JSON and must be at most 1 MiB. It requires a `default`
 policy. Each policy requires both directional rate fields. An omitted field is
@@ -109,10 +119,9 @@ GOTOOLCHAIN=auto go build ./cmd/derper
 ```
 
 Start `derper` with both `--verify-clients=true` and
-`--user-rate-config=/path/to/user-rate.json`. Keep mesh flags and effective mesh
-keys absent. Startup rejects an invalid configuration, a disabled verification
-flag, the old rate configuration, or mesh settings. It does not begin serving
-with a partial policy.
+`--user-rate-config=/path/to/user-rate.json`. Startup rejects an invalid
+configuration, a disabled verification flag, or the old rate configuration. It
+does not begin serving with a partial policy.
 
 Send `SIGHUP` to reload the same configuration path. The server validates the
 entire replacement before publishing it. A failed reload logs a non-sensitive
@@ -122,7 +131,7 @@ it. A transition from zero (unlimited) to a nonzero rate creates a new limiter,
 which receives its initial configured burst. Existing and new connections use
 the new policies after the reload completes.
 
-To roll back, remove `--user-rate-config`, restore any intended upstream mesh or
+To roll back, remove `--user-rate-config`, restore any intended upstream
 `--rate-config` settings, and restart the process. The mode is selected at
 startup; an empty file cannot switch modes during reload.
 
@@ -141,13 +150,18 @@ unchanged.
 
 [Issue #5](https://github.com/WooDragon/derper-plus/issues/5) proposes a future
 policy input that maps `grants.app` data through `WhoIsResponse.CapMap`. It is
-not implemented. The current policer accepts only local JSON configuration.
+not implemented. The current policer accepts only local JSON configuration. The
+original bounded design and its recorded review decisions are kept in the
+implementation plan, [derper-user-qos-plan.md](derper-user-qos-plan.md), which
+is a historical record rather than a description of current behavior.
 
 ## Deferred operator validation
 
-This delivery deliberately adds no tests and does not run runtime probes.
-Before production use, operators should validate user aggregation, simultaneous
-connections, reconnect behavior, reload behavior, owner/trusted exemptions,
-packet loss behavior, and expected throughput in an isolated environment. The
-operator remains responsible for network-level shaping when physical ingress or
-wire-byte accounting is required.
+The original per-user policing delivery added no tests. Mesh-peer exemption
+behavior has unit test coverage. No runtime probes or production validation have
+been performed for either. Before production use, operators should validate
+user aggregation, simultaneous connections, reconnect behavior, reload behavior,
+owner/trusted exemptions, mesh-peer exemption, packet loss behavior, and
+expected throughput in an isolated environment. The operator remains
+responsible for network-level shaping when physical ingress or wire-byte
+accounting is required.

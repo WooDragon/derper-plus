@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -129,6 +130,168 @@ func TestIsMeshPeer(t *testing.T) {
 				t.Errorf("%f allocations, want %f", allocs, tt.wantAllocs)
 			}
 		})
+	}
+}
+
+func TestUserRateMeshPeerExempt(t *testing.T) {
+	s := New(key.NewNode(), logger.Discard)
+	defer s.Close()
+	tinyPolicy := userRatePolicy{
+		uploadBytesPerSecond:   1,
+		downloadBytesPerSecond: 1,
+		burstBytes:             derp.MaxPacketSize,
+	}
+	s.userRate = newUserRateRegistry(userRateConfig{
+		defaultPolicy: tinyPolicy,
+		taggedPolicy:  tinyPolicy,
+	})
+	c := &sclient{
+		s:               s,
+		logf:            logger.Discard,
+		canMesh:         true,
+		userRate:        s.userRate,
+		userRateSubject: userRateSubject{},
+	}
+	for i := range 5 {
+		if !c.allowUserRateUpload(derp.MaxPacketSize) {
+			t.Fatalf("mesh upload call %d was denied", i)
+		}
+		if !c.allowUserRateDownload(derp.MaxPacketSize) {
+			t.Fatalf("mesh download call %d was denied", i)
+		}
+	}
+	if got := s.userRateUploadDropped.Value(); got != 0 {
+		t.Errorf("userRateUploadDropped = %d, want 0", got)
+	}
+	if got := s.userRateDownloadDropped.Value(); got != 0 {
+		t.Errorf("userRateDownloadDropped = %d, want 0", got)
+	}
+	s.userRate.mu.RLock()
+	defer s.userRate.mu.RUnlock()
+	if got := len(s.userRate.buckets); got != 0 {
+		t.Errorf("user rate bucket count = %d, want 0", got)
+	}
+	if s.userRate.buckets[userRateSubject{}] != nil {
+		t.Error("mesh zero subject unexpectedly has a user rate bucket")
+	}
+}
+
+func TestUserRateNonMeshStillPoliced(t *testing.T) {
+	s := New(key.NewNode(), logger.Discard)
+	defer s.Close()
+	tinyPolicy := userRatePolicy{
+		uploadBytesPerSecond:   1,
+		downloadBytesPerSecond: 1,
+		burstBytes:             derp.MaxPacketSize,
+	}
+	s.userRate = newUserRateRegistry(userRateConfig{
+		defaultPolicy: tinyPolicy,
+		taggedPolicy:  tinyPolicy,
+	})
+	subject := userRateSubject{userID: 12345}
+	c := &sclient{
+		s:               s,
+		logf:            logger.Discard,
+		canMesh:         false,
+		userRate:        s.userRate,
+		userRateSubject: subject,
+	}
+	if !c.allowUserRateUpload(derp.MaxPacketSize) {
+		t.Fatal("first non-mesh upload was denied")
+	}
+	denied := false
+	for range 10 {
+		if !c.allowUserRateUpload(derp.MaxPacketSize) {
+			denied = true
+			break
+		}
+	}
+	if !denied {
+		t.Fatal("non-mesh upload was never denied")
+	}
+	s.userRate.mu.RLock()
+	defer s.userRate.mu.RUnlock()
+	if s.userRate.buckets[subject] == nil {
+		t.Error("non-mesh subject has no user rate bucket")
+	}
+}
+
+func TestUserRateTaggedPolicy(t *testing.T) {
+	s := New(key.NewNode(), logger.Discard)
+	defer s.Close()
+	defaultPolicy := userRatePolicy{
+		uploadBytesPerSecond:   0,
+		downloadBytesPerSecond: 0,
+		burstBytes:             derp.MaxPacketSize,
+	}
+	taggedPolicy := userRatePolicy{
+		uploadBytesPerSecond:   1,
+		downloadBytesPerSecond: 1,
+		burstBytes:             derp.MaxPacketSize,
+	}
+	s.userRate = newUserRateRegistry(userRateConfig{
+		defaultPolicy: defaultPolicy,
+		taggedPolicy:  taggedPolicy,
+	})
+	tagged := &sclient{
+		s:               s,
+		logf:            logger.Discard,
+		userRate:        s.userRate,
+		userRateSubject: userRateSubject{tagged: true},
+	}
+	if !tagged.allowUserRateUpload(derp.MaxPacketSize) {
+		t.Fatal("first tagged upload was denied")
+	}
+	denied := false
+	for range 10 {
+		if !tagged.allowUserRateUpload(derp.MaxPacketSize) {
+			denied = true
+			break
+		}
+	}
+	if !denied {
+		t.Fatal("tagged upload was never denied")
+	}
+
+	defaultClient := &sclient{
+		s:               s,
+		logf:            logger.Discard,
+		userRate:        s.userRate,
+		userRateSubject: userRateSubject{userID: 999},
+	}
+	for i := range 10 {
+		if !defaultClient.allowUserRateUpload(derp.MaxPacketSize) {
+			t.Fatalf("unlimited default upload call %d was denied", i)
+		}
+	}
+}
+
+func TestVerifyClientMeshPeerWithUserRate(t *testing.T) {
+	s := New(key.NewNode(), logger.Discard)
+	defer s.Close()
+	if err := s.SetMeshKey(testMeshKey); err != nil {
+		t.Fatal(err)
+	}
+	tinyPolicy := userRatePolicy{
+		uploadBytesPerSecond:   1,
+		downloadBytesPerSecond: 1,
+		burstBytes:             derp.MaxPacketSize,
+	}
+	s.userRate = newUserRateRegistry(userRateConfig{
+		defaultPolicy: tinyPolicy,
+		taggedPolicy:  tinyPolicy,
+	})
+	mKey, err := key.ParseDERPMesh(testMeshKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	info := &derp.ClientInfo{MeshKey: mKey}
+	subject, err := s.verifyClient(context.Background(), key.NewNode().Public(), info, netip.MustParseAddr("127.0.0.1"))
+	if err != nil {
+		t.Fatalf("verifyClient: %v", err)
+	}
+	if subject != (userRateSubject{}) {
+		t.Errorf("subject = %+v, want zero subject", subject)
 	}
 }
 
