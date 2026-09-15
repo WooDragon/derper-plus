@@ -40,7 +40,7 @@ STUN is a connectivity probe, not a business relay path.
 
 [Peer Relay](https://tailscale.com/docs/features/peer-relay) is an official
 Tailscale feature with a separate UDP relay path. It does not invoke this
-policer. Peer Relay is not implemented by this fork. Native DERP clients use
+policer. This derper process is not a Peer Relay server. Native DERP clients use
 TCP/TLS and an HTTP/1 Upgrade. This fork does not implement HTTP/3 or QUIC for
 DERP. Enabling HTTP/3 in an external Caddy listener does not change the DERP
 client path. See Tailscale's [connection type reference](https://tailscale.com/docs/reference/connection-types)
