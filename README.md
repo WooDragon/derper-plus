@@ -29,18 +29,21 @@ see [https://tailscale.com/opensource/](https://tailscale.com/opensource/).
 fork release branch. Feature and delivery pull requests target `stable`; do not
 merge fork changes directly into `main`.
 
-This fork provides the planned multi-platform DERP image at
-`ghcr.io/woodragon/derper-plus`. Read [the container delivery guide](docs/derper-container.md)
-for publication rules, image usage, persistence, rollback, and verification
-limits. The documented reference does not claim that a package is public or
-runtime-verified.
+This fork publishes the multi-platform DERP image at
+`ghcr.io/woodragon/derper-plus`, including tag `v1.102.4-plus.1`. Find release
+artifacts through [Git tags](https://github.com/WooDragon/derper-plus/tags),
+the [GHCR package](https://github.com/WooDragon/derper-plus/pkgs/container/derper-plus),
+and [Actions](https://github.com/WooDragon/derper-plus/actions); this fork does
+not publish GitHub Release-page assets. Read [the container delivery guide](docs/derper-container.md)
+for image usage, persistence, rollback, and verification limits. Publication
+does not establish container runtime acceptance.
 
 ## Fork-specific DERP user limits
 
 This public fork adds opt-in, per-process DERP packet policing by authenticated
-user. Read [the feature guide](docs/derper-user-qos.md) before enabling it. Read
-[the approved design](docs/derper-user-qos-plan.md) for its compatibility and
-security boundaries.
+user. Read [the feature guide](docs/derper-user-qos.md) before enabling it. The
+guide defines the current DERP-only scope and links the separate future-policy
+proposal.
 
 ## Using
 

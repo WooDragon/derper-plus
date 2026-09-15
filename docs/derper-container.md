@@ -2,8 +2,8 @@
 
 ## Scope and publication status
 
-`derper-plus` provides a DERP container delivery path for this fork. The intended
-image name is `ghcr.io/woodragon/derper-plus`. The image is built for
+`derper-plus` provides a DERP container delivery path for this fork. The
+published image name is `ghcr.io/woodragon/derper-plus`. The image is built for
 `linux/amd64` and `linux/arm64`. Registry publication does not establish runtime
 acceptance.
 
@@ -17,11 +17,12 @@ chosen socket. If an operator selects a non-root user, the operator must pass
 able to write the selected key, state, and certificate paths. That user must
 also have permission to bind the selected ports and access the socket.
 
-A successful build or publish does not prove that the package is public. The
-first GHCR publication can require a package administrator to change visibility
-in the GitHub UI. The package page is
-<https://github.com/users/WooDragon/packages/container/package/derper-plus>.
-Do not claim anonymous availability until an anonymous pull has succeeded.
+The public GHCR package has published tag `v1.102.4-plus.1`. Find release
+artifacts through [Git tags](https://github.com/WooDragon/derper-plus/tags),
+the [GHCR package](https://github.com/WooDragon/derper-plus/pkgs/container/derper-plus),
+and [Actions](https://github.com/WooDragon/derper-plus/actions). This fork does
+not publish GitHub Release-page assets. Publication establishes image
+availability, not container runtime acceptance or traffic validation.
 
 ## Build and publishing policy
 
