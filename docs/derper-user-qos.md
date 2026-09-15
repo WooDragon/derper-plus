@@ -12,9 +12,10 @@ control plane.
 ## Scope and limits
 
 The server charges upload allowance after it fully reads a DERP packet payload
-and before it looks up the destination or forwards the packet. An unknown
-destination can therefore consume the sender's allowance. The server checks
-download allowance before it writes a packet frame to the destination client.
+and before it looks up the destination or forwards the packet, except for
+mesh-forwarded ingress. An unknown destination can therefore consume the
+sender's allowance. The server checks download allowance before it writes a
+packet frame to the destination client.
 
 The policer counts DERP packet payload bytes, including encrypted discovery
 payloads. It does not count TCP, TLS, DERP frame headers, or control frames.
@@ -38,16 +39,16 @@ They apply only to DERP payloads in this `derper` process, including payloads
 whose inner traffic is TCP or UDP. They do not apply to direct P2P traffic.
 STUN is a connectivity probe, not a business relay path.
 
-Mesh peers are exempt from this policer. A relay polices the clients whose
-identity it can resolve from its own authenticated local Tailscale state. A
-mesh peer is not a tailnet member and has no resolvable user identity. Traffic
-therefore gets policed once, at the relay where the sending user is connected.
-A user connected to relay A is policed by A. Traffic that reaches mesh peer B
-over the mesh is not policed by B, even for a user B would police on a direct
-connection. A user's allowance applies only at the relay the user is connected
-to, so a user can reach a destination behind B without B applying its own
-allowance. This is the intended behavior for ingress policing and is
-consistent with the per-process scope already stated above.
+Mesh connections themselves are exempt from this policer. A mesh peer is not a
+tailnet member and has no resolvable user identity, so its zero subject never
+reaches the policer's default policy. The server charges a sender's upload
+allowance only at the relay where that sender is connected. A forwarded packet
+between relays is not charged as an upload at the receiving relay. When that
+receiving relay writes the packet to a local destination user, however, it
+charges that user's download allowance. Mesh deployment therefore removes a
+second upload charge at the far relay; it does not remove all policing there.
+As with same-relay delivery, a packet still incurs one upload charge and one
+download charge, split across two relays when it crosses the mesh.
 
 [Peer Relay](https://tailscale.com/docs/features/peer-relay) is an official
 Tailscale feature with a separate UDP relay path. It does not invoke this

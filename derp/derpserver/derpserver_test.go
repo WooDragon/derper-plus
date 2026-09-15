@@ -134,86 +134,143 @@ func TestIsMeshPeer(t *testing.T) {
 }
 
 func TestUserRateMeshPeerExempt(t *testing.T) {
-	s := New(key.NewNode(), logger.Discard)
-	defer s.Close()
-	tinyPolicy := userRatePolicy{
-		uploadBytesPerSecond:   1,
-		downloadBytesPerSecond: 1,
-		burstBytes:             derp.MaxPacketSize,
-	}
-	s.userRate = newUserRateRegistry(userRateConfig{
-		defaultPolicy: tinyPolicy,
-		taggedPolicy:  tinyPolicy,
-	})
-	c := &sclient{
-		s:               s,
-		logf:            logger.Discard,
-		canMesh:         true,
-		userRate:        s.userRate,
-		userRateSubject: userRateSubject{},
-	}
-	for i := range 5 {
-		if !c.allowUserRateUpload(derp.MaxPacketSize) {
-			t.Fatalf("mesh upload call %d was denied", i)
-		}
-		if !c.allowUserRateDownload(derp.MaxPacketSize) {
-			t.Fatalf("mesh download call %d was denied", i)
+	s := newUserRateTestServer(t)
+	dst := newUserRateTestClient(t, s, userRateSubject{userID: 1}, false)
+	storeUserRateTestClient(s, dst)
+	mesh := newUserRateTestClient(t, s, userRateSubject{}, true)
+
+	for range 2 {
+		mesh.br = userRateTestPacketReader(dst.key, []byte("x"))
+		if err := mesh.handleFrameSendPacket(derp.FrameSendPacket, derp.KeyLen+1); err != nil {
+			t.Fatalf("handleFrameSendPacket: %v", err)
 		}
 	}
 	if got := s.userRateUploadDropped.Value(); got != 0 {
-		t.Errorf("userRateUploadDropped = %d, want 0", got)
-	}
-	if got := s.userRateDownloadDropped.Value(); got != 0 {
-		t.Errorf("userRateDownloadDropped = %d, want 0", got)
+		t.Errorf("mesh userRateUploadDropped = %d, want 0", got)
 	}
 	s.userRate.mu.RLock()
 	defer s.userRate.mu.RUnlock()
-	if got := len(s.userRate.buckets); got != 0 {
-		t.Errorf("user rate bucket count = %d, want 0", got)
-	}
 	if s.userRate.buckets[userRateSubject{}] != nil {
 		t.Error("mesh zero subject unexpectedly has a user rate bucket")
 	}
 }
 
 func TestUserRateNonMeshStillPoliced(t *testing.T) {
+	s := newUserRateTestServer(t)
+	src := newUserRateTestClient(t, s, userRateSubject{userID: 1}, false)
+	dst := newUserRateTestClient(t, s, userRateSubject{userID: 2}, false)
+	storeUserRateTestClient(s, dst)
+
+	for range 2 {
+		src.br = userRateTestPacketReader(dst.key, []byte("x"))
+		if err := src.handleFrameSendPacket(derp.FrameSendPacket, derp.KeyLen+1); err != nil {
+			t.Fatalf("handleFrameSendPacket: %v", err)
+		}
+	}
+	if got := s.userRateUploadDropped.Value(); got != 1 {
+		t.Errorf("userRateUploadDropped = %d, want 1", got)
+	}
+
+	for range 2 {
+		if err := dst.sendPacket(src.key, []byte("x")); err != nil {
+			t.Fatalf("sendPacket: %v", err)
+		}
+	}
+	if got := s.userRateDownloadDropped.Value(); got != 1 {
+		t.Errorf("userRateDownloadDropped = %d, want 1", got)
+	}
+}
+
+func TestUserRateMeshForwardPacketChargesLocalDestination(t *testing.T) {
+	s := newUserRateTestServer(t)
+	dst := newUserRateTestClient(t, s, userRateSubject{userID: 1}, false)
+	storeUserRateTestClient(s, dst)
+	mesh := newUserRateTestClient(t, s, userRateSubject{}, true)
+	srcKey := key.NewNode().Public()
+
+	for range 2 {
+		mesh.br = userRateTestForwardPacketReader(srcKey, dst.key, []byte("x"))
+		if err := mesh.handleFrameForwardPacket(derp.FrameForwardPacket, derp.KeyLen*2+1); err != nil {
+			t.Fatalf("handleFrameForwardPacket: %v", err)
+		}
+		p := <-dst.sendQueue
+		if err := dst.sendPacket(p.src, p.bs); err != nil {
+			t.Fatalf("sendPacket: %v", err)
+		}
+	}
+	if got := s.userRateUploadDropped.Value(); got != 0 {
+		t.Errorf("mesh userRateUploadDropped = %d, want 0", got)
+	}
+	if got := s.userRateDownloadDropped.Value(); got != 1 {
+		t.Errorf("userRateDownloadDropped = %d, want 1", got)
+	}
+	s.userRate.mu.RLock()
+	defer s.userRate.mu.RUnlock()
+	if s.userRate.buckets[userRateSubject{}] != nil {
+		t.Error("mesh zero subject unexpectedly has a user rate bucket")
+	}
+	if s.userRate.buckets[dst.userRateSubject] == nil {
+		t.Error("local destination has no download rate bucket")
+	}
+}
+
+func newUserRateTestServer(t *testing.T) *Server {
+	t.Helper()
 	s := New(key.NewNode(), logger.Discard)
-	defer s.Close()
+	t.Cleanup(func() { s.Close() })
 	tinyPolicy := userRatePolicy{
 		uploadBytesPerSecond:   1,
 		downloadBytesPerSecond: 1,
-		burstBytes:             derp.MaxPacketSize,
+		burstBytes:             1,
 	}
 	s.userRate = newUserRateRegistry(userRateConfig{
 		defaultPolicy: tinyPolicy,
 		taggedPolicy:  tinyPolicy,
 	})
-	subject := userRateSubject{userID: 12345}
-	c := &sclient{
+	return s
+}
+
+func newUserRateTestClient(t *testing.T, s *Server, subject userRateSubject, canMesh bool) *sclient {
+	t.Helper()
+	serverConn, clientConn := net.Pipe()
+	t.Cleanup(func() {
+		serverConn.Close()
+		clientConn.Close()
+	})
+	return &sclient{
 		s:               s,
+		nc:              serverConn,
+		key:             key.NewNode().Public(),
 		logf:            logger.Discard,
-		canMesh:         false,
+		ctx:             context.Background(),
+		sendQueue:       make(chan pkt, 2),
+		discoSendQueue:  make(chan pkt, 2),
+		canMesh:         canMesh,
 		userRate:        s.userRate,
 		userRateSubject: subject,
+		bw:              &lazyBufioWriter{w: clientConn},
 	}
-	if !c.allowUserRateUpload(derp.MaxPacketSize) {
-		t.Fatal("first non-mesh upload was denied")
-	}
-	denied := false
-	for range 10 {
-		if !c.allowUserRateUpload(derp.MaxPacketSize) {
-			denied = true
-			break
-		}
-	}
-	if !denied {
-		t.Fatal("non-mesh upload was never denied")
-	}
-	s.userRate.mu.RLock()
-	defer s.userRate.mu.RUnlock()
-	if s.userRate.buckets[subject] == nil {
-		t.Error("non-mesh subject has no user rate bucket")
-	}
+}
+
+func storeUserRateTestClient(s *Server, c *sclient) {
+	clients := &clientSet{}
+	clients.activeClient.Store(c)
+	s.clients.Store(c.key, clients)
+}
+
+func userRateTestPacketReader(dst key.NodePublic, contents []byte) *bufio.Reader {
+	var frame bytes.Buffer
+	_, _ = frame.Write(dst.AppendTo(nil))
+	_, _ = frame.Write(contents)
+	return bufio.NewReader(&frame)
+}
+
+func userRateTestForwardPacketReader(src, dst key.NodePublic, contents []byte) *bufio.Reader {
+	var frame bytes.Buffer
+	_, _ = frame.Write(src.AppendTo(nil))
+	_, _ = frame.Write(dst.AppendTo(nil))
+	_, _ = frame.Write(contents)
+	return bufio.NewReader(&frame)
 }
 
 func TestUserRateTaggedPolicy(t *testing.T) {
