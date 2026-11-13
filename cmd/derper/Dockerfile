@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # Build on the native BuildKit platform. The final scratch stage only copies
 # static files, so target binaries never execute during assembly.
-FROM --platform=$BUILDPLATFORM golang:1.26.6-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS build
 
 ARG TARGETOS
 ARG TARGETARCH

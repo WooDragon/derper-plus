@@ -11,5 +11,8 @@ unchanged unless a documented fork-specific contract requires a change.
 
 Before changing container delivery, read
 [the container delivery guide](docs/derper-container.md). Before changing
-per-user DERP policing, read [the feature guide](docs/derper-user-qos.md). The
-guide also links the separate future-policy proposal.
+per-user DERP policing, read [the feature guide](docs/derper-user-qos.md).
+Before changing per-tailnet aggregate policing, read the
+[tailnet feature guide](docs/derper-tailnet-qos.md) (versioned external admission;
+local implementation, not a deployed release) and its
+[accepted ADR](docs/adr-derper-tailnet-aggregate-rate-limit.md).
