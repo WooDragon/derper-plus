@@ -147,7 +147,14 @@ Unknown, incomplete, or non-positive user identity data fails closed. When this
 feature is disabled, the upstream verification and admission log behavior is
 unchanged.
 
-## Future direction
+## Separate tailnet mode and future direction
+
+Before configuring per-tailnet aggregate policing with versioned external
+admission, read [the tailnet feature guide](derper-tailnet-qos.md) and its
+[accepted ADR](adr-derper-tailnet-aggregate-rate-limit.md). That separate mode is
+implemented and locally verified, but has not been deployed. It is mutually
+exclusive with this per-user mode and does not change the behavior above.
+Per-user owner exceptions do not migrate to the tailnet mode.
 
 [Issue #5](https://github.com/WooDragon/derper-plus/issues/5) proposes a future
 policy input that maps `grants.app` data through `WhoIsResponse.CapMap`. It is
