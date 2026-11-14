@@ -1,7 +1,7 @@
 # ADR: Per-tailnet aggregate DERP payload rate limits
 
 - Date: 2026-11-12
-- Status: Accepted / Implemented and locally verified; not deployed
+- Status: Accepted / Implemented and locally verified; plain-account v2 deployed and accepted in Chengdu on 2026-11-14 (see the deployment record below)
 - Audience: DERP maintainers and admission-service implementers.
 
 ## Decision and authority
@@ -228,8 +228,11 @@ transmission of the registering account in `Devices.user`, with the existing
 callback-token authentication unchanged and no additional account secret. The
 plain-account implementation passed independent redteam code review; its sole
 Unicode-collision finding was fixed and rechecked. That review does not cover
-this documentation update or authorize rollout. Production still uses network
-identity v1; plain-account v2 has not been deployed.
+this documentation update or authorize rollout. Separately authorized plain-account
+v2 was deployed and accepted in Chengdu on 2026-11-14 at revision
+`d483b6463b8d1be90ba91115a975ae2532e8b503`; see the
+[deployment record in Issue #12](https://github.com/WooDragon/derper-plus/issues/12#issuecomment-6877133383).
+That acceptance does not constitute throughput certification.
 
 Before the Unicode fix, local execution passed 267 Worker unit tests, 79 real-workerd
 tests, 30 joint scenarios, and targeted Go tests. The joint run had zero skips,
