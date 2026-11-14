@@ -1,9 +1,12 @@
 # DERP per-tailnet aggregate payload limits
 
 This guide is for DERP operators who use a trusted external admission service.
-The mode is implemented and locally verified. It has not been deployed or
-published as part of this delivery. Existing images and deployments shall not
-be assumed to contain these flags.
+The mode is implemented and locally verified. Plain-account v2 was published,
+deployed, and accepted in Chengdu on 2026-11-14 at revision
+`d483b6463b8d1be90ba91115a975ae2532e8b503`; see the
+[deployment record in Issue #12](https://github.com/WooDragon/derper-plus/issues/12#issuecomment-6877133383).
+That acceptance does not constitute throughput certification. Other images and
+deployments shall not be assumed to contain these flags.
 
 Before changing the protocol or policy lifecycle, read
 [the accepted ADR](adr-derper-tailnet-aggregate-rate-limit.md). For local WhoIs
@@ -206,9 +209,11 @@ successful refresh under the new Worker. Operators shall then read back v2
 `Kind:user` and the expected raw registering account, and confirm identical keys
 for tagged and untagged devices with the same registering account. Health
 responses, a triggered Cron, an old LKG, or one successful source alone do not
-establish readiness. Production still uses network identity v1; raw-account v2
-has not been deployed. Publication, deployment, full-source prewarming/readback,
-consumer cutover, and rollback preparation require subsequent authorization.
+establish readiness. The separately authorized raw-account v2 rollout completed
+full-source prewarming/readback and consumer cutover in Chengdu on 2026-11-14.
+The [deployment record in Issue #12](https://github.com/WooDragon/derper-plus/issues/12#issuecomment-6877133383)
+records the accepted revision, production acceptance, and rollback boundary.
+This documentation update authorizes no further rollout and reruns no tests.
 Infinite LKG retention can delay revocation indefinitely; user-string changes
 or reuse can alter attribution while existing connections retain old identities.
 
