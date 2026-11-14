@@ -315,7 +315,7 @@ The Worker uses valid `Devices.user` from `devices:core:read` as the registering
 account for both tagged and untagged devices. It does not call the Users API or
 infer current owner/admin status. Tags do not affect projection, including
 missing or malformed tag fields. A valid account is a nonempty string with no
-leading/trailing whitespace, no U+0000–U+001F or U+007F–U+009F control characters,
+leading/trailing whitespace (including U+FEFF), no U+0000–U+001F or U+007F–U+009F control characters,
 no isolated surrogate, and at most 1024 UTF-8 bytes. Valid Unicode, including
 paired surrogates, shall remain unchanged. Missing or invalid user evidence
 shall yield unknown and reject v2. Valid legacy/v1 membership remains unchanged.

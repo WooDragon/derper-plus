@@ -166,8 +166,7 @@ current owner. Devices with the same `(network,user)` share one account bucket
 pair; the same string in different networks remains isolated. Tags do not affect
 rate classification. The undeployed `tagged/shared` identity and `accounts.tagged`
 leaf have been removed; valid identities select a user override or
-`accounts.default`. The server continues to accept
-`tagged/shared` and applies the separate compatibility leaf to that identity.
+`accounts.default`.
 
 In the example, the zero-rate user still obeys the network's 10485760-byte/s
 parent in each direction. A zero parent with a finite child obeys the child;
@@ -182,7 +181,7 @@ retains historical child buckets. Reconnects do not replenish balances; buckets
 are not garbage-collected. Mode changes require a different process, not an
 empty policy or a reload.
 
-A valid account is nonempty, has no leading/trailing whitespace, contains no
+A valid account is nonempty, has no leading/trailing whitespace (including U+FEFF), contains no
 U+0000–U+001F or U+007F–U+009F control characters or isolated surrogate, and is at
 most 1024 UTF-8 bytes. Valid Unicode, including paired surrogates, remains
 unchanged. The wire and policy parsers reject isolated JSON surrogate escapes
