@@ -2,7 +2,6 @@ package derpserver
 
 import (
 	"fmt"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -15,7 +14,7 @@ func accountID(network, kind, key string) tailnetAccountIdentity {
 	return tailnetAccountIdentity{network, kind, key}
 }
 func userID(network string, digit string) tailnetAccountIdentity {
-	return accountID(network, "user", "h1_"+strings.Repeat(digit, 64))
+	return accountID(network, "user", digit+"@synthetic.test")
 }
 func parseAccountConfig(t *testing.T, input string) tailnetRateConfig {
 	t.Helper()
@@ -69,7 +68,7 @@ func TestAccountIsolationAndZero(t *testing.T) {
 			cfg.defaultPolicy = new(tailnetRatePolicy)
 			*cfg.defaultPolicy = cfg.policies["network"]
 			r := newTailnetRateRegistry(cfg, func() time.Time { return time.Unix(1, 0) })
-			a, b, other, tag := userID("network", "a"), userID("network", "b"), userID("other", "a"), accountID("network", "tagged", "shared")
+			a, b, other, tag := userID("network", "a"), userID("network", "b"), userID("other", "a"), userID("network", "tagged-registrant")
 			for _, id := range []tailnetAccountIdentity{a, b, other, tag} {
 				if !r.admitAccount(id) {
 					t.Fatal("admit")

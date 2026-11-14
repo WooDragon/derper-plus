@@ -125,8 +125,8 @@ False rejects every `accounts` entry at initial load or reload. True requires
 networks whose policy has no account layer. SIGHUP cannot change the capability.
 Missing/unknown account evidence rejects v2; it never falls back to v1.
 
-The following policy uses a synthetic fixture key and fictitious subject. It is
-an interface example, not production configuration or a rollout command:
+The following policy uses a synthetic account and fictitious subject. It is an
+interface example, not production configuration or a rollout command:
 
 ```json
 {
@@ -140,14 +140,10 @@ an interface example, not production configuration or a rollout command:
           "download_bytes_per_second": 1048576
         },
         "overrides": {
-          "h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987": {
+          "Synthetic.User@example.test": {
             "upload_bytes_per_second": 0,
             "download_bytes_per_second": 0
           }
-        },
-        "tagged": {
-          "upload_bytes_per_second": 1048576,
-          "download_bytes_per_second": 1048576
         }
       }
     }
@@ -155,18 +151,22 @@ an interface example, not production configuration or a rollout command:
 }
 ```
 
-`accounts.default` and `accounts.tagged` are mandatory when accounts is present;
-`overrides` may be omitted. Overrides replace complete leaves. Leaf integer and
-burst validation matches the parent, and nested accounts is invalid. An exact
-network policy without accounts does not inherit the top-level default's
-accounts. Override keys are 67-character `h1_` user keys, not network subjects.
-The `accounts.tagged` leaf in this example is required compatibility policy for
-existing `tagged/shared` evidence, not the new Worker's production classification.
-The new Worker derives `Kind:user` for both tagged and untagged devices from
-valid `Devices.user`, the registering account rather than the current owner.
-Devices with the same `(network,user)` share the unchanged HMAC key and bucket.
-Tags do not affect rate classification. These identities select a user override
-or `accounts.default`, not `accounts.tagged`. The server continues to accept
+`accounts.default` is mandatory when accounts is present; `overrides` may be
+omitted. These are the only accounts fields. Overrides replace complete leaves.
+Leaf integer and burst validation matches the parent, and nested accounts is
+invalid. An exact network policy without accounts does not inherit the top-level
+default's accounts. An override key is the exact valid registering-account
+string from `Devices.user`, not a derived key or a network subject. Operators
+shall configure it directly under the intended network without trimming,
+lowercasing, Unicode normalization, or alias merging.
+
+The Worker sends `Account:{Kind:"user",Key:<raw registering account>}` for tagged
+and untagged devices. `Devices.user` identifies the registering account, not the
+current owner. Devices with the same `(network,user)` share one account bucket
+pair; the same string in different networks remains isolated. Tags do not affect
+rate classification. The undeployed `tagged/shared` identity and `accounts.tagged`
+leaf have been removed; valid identities select a user override or
+`accounts.default`. The server continues to accept
 `tagged/shared` and applies the separate compatibility leaf to that identity.
 
 In the example, the zero-rate user still obeys the network's 10485760-byte/s
@@ -182,40 +182,52 @@ retains historical child buckets. Reconnects do not replenish balances; buckets
 are not garbage-collected. Mode changes require a different process, not an
 empty policy or a reload.
 
-The admission service derives user keys using a secret HMAC over the exact JSON
-array defined in the ADR. Missing or invalid `Devices.user` yields unknown account
-evidence and rejects v2; tags do not provide a fallback. Valid legacy/v1 membership
-remains unchanged. Operators shall not substitute raw user/email strings
-or infer keys from local WhoIs. The companion offline tool reads stdin JSON
-only; its actual usage is documented with that service. No production account
-secret was generated or uploaded. Protected backup, recovery, prewarming, and
-coordinated migration require separate approval. Secret rotation is not
-transparent: it changes account keys/overrides/bucket identity while old
-connections retain old identities. Infinite LKG retention can delay revocation
-indefinitely, and user-string changes or reuse can alter attribution.
+A valid account is nonempty, has no leading/trailing whitespace, contains no
+U+0000–U+001F or U+007F–U+009F control characters or isolated surrogate, and is at
+most 1024 UTF-8 bytes. Valid Unicode, including paired surrogates, remains
+unchanged. The wire and policy parsers reject isolated JSON surrogate escapes
+rather than merge them into U+FFFD; a valid U+FFFD remains accepted. Missing or
+invalid `Devices.user` yields unknown account evidence and rejects v2. Valid
+legacy/v1 membership remains unchanged; local WhoIs is not an identity source.
 
-Existing shared snapshots with a valid context remain legal, and a failed
-refresh retains their LKG. Before a consumer cutover, every configured source
-shall complete a real successful refresh under the new Worker. Operators shall
-then read back v2 `Kind:user` and confirm identical keys for tagged and untagged
-devices with the same registering account. Health responses, valid context, or
-old shared evidence do not establish that readiness. These are prerequisites,
-not authorization for production actions.
+Raw accounts enter snapshots and v2 responses, but not ordinary request logs.
+The HTTPS callback and existing callback-token authentication are unchanged.
+The account secret, HMAC/context derivation, offline tool, dedicated derivation
+vectors, and related backup/rotation obligations have been removed.
 
-The registering-account correction passed 298 Worker unit tests, 84 real-workerd
-tests, and 30 joint scenarios with zero skips. Five top-level Go compatibility
-tests and 44 subtests passed. The joint runner reclaimed all ten listeners with
-zero cleanup errors. Independent redteam review of the five-file implementation
-and test increment returned APPROVED with no required fixes; it did not review
-this documentation update or authorize rollout. Earlier full Go/race and
-performance results remain historical evidence, not reruns for this correction.
+The new Worker retains base snapshot schema v2 and writes exactly
+`accountEvidence:{version:2}` after a complete successful refresh. Every
+participating source requires this metadata for v2. Old evidence version 1,
+version 2 with a context field, and missing account metadata reject v2 without
+invalidating otherwise valid legacy/v1 membership. A failed refresh retains the
+complete LKG, not proof that raw-account evidence is ready.
 
-The dated local results, fixed old-Worker commit, and accepted reload-cost
-limitation are retained in
+Before a consumer cutover, every configured source shall complete a real
+successful refresh under the new Worker. Operators shall then read back v2
+`Kind:user` and the expected raw registering account, and confirm identical keys
+for tagged and untagged devices with the same registering account. Health
+responses, a triggered Cron, an old LKG, or one successful source alone do not
+establish readiness. Production still uses network identity v1; raw-account v2
+has not been deployed. Publication, deployment, full-source prewarming/readback,
+consumer cutover, and rollback preparation require subsequent authorization.
+Infinite LKG retention can delay revocation indefinitely; user-string changes
+or reuse can alter attribution while existing connections retain old identities.
+
+The user-approved plain-account implementation passed independent redteam code
+review, and its sole Unicode-collision finding was fixed and rechecked. That
+review does not cover this documentation update or authorize rollout. Before the
+Unicode fix, 267 unit, 79 real-workerd, 30 joint scenarios, and targeted Go tests
+passed; the joint run had zero skips, ten reclaimed listeners, and zero cleanup
+errors. After the fix, only 91 account tests, typecheck, and Go Account tests
+(27 top-level plus 102 subtests) were rerun and passed. The 267/79/30 results are
+not final-tree reruns. Earlier full Go/race and performance results remain
+historical evidence. This documentation update reruns no tests.
+
+Dated evidence and the accepted reload-cost limitation are retained in
 [Issue #12](https://github.com/WooDragon/derper-plus/issues/12). The existing
 writer-flood test-oracle defect is independently tracked in
 [Issue #13](https://github.com/WooDragon/derper-plus/issues/13); it is not fixed by
-this increment. No account-layer commit, release, or deployment is claimed.
+this increment.
 
 ## Local verification and release boundary
 
@@ -226,8 +238,9 @@ required fixes. The dated results and limitations are recorded in existing
 [Issue #10](https://github.com/WooDragon/derper-plus/issues/10), not as permanent
 test-count requirements in this guide.
 
-The source-content update to upstream stable is not a merge to `stable` or a
-published release. Both linux/amd64 and linux/arm64 OCI builds passed, but no
-container was run or published. The default CGO command build did not pass on
-the local machine without Xcode; the pure-Go build and the two-package race run
-did pass. This delivery installed no system tools and made no production change.
+The earlier stable-baseline verification passed linux/amd64 and linux/arm64 OCI
+builds; that execution did not run or publish a container. The default CGO command
+build did not pass on the local machine without Xcode; the pure-Go build and the
+two-package race run did pass. Those results describe that execution, not later
+branch integration or release status. This documentation update installs no
+system tools and makes no production change.

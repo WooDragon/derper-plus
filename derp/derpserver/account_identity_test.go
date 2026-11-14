@@ -16,8 +16,8 @@ func TestAccountIdentityRegistryBoundary(t *testing.T) {
 	r := newTailnetRateRegistry(parseAccountConfig(t, accountConfig("0", accountLeaf(0, 0))), func() time.Time { return time.Unix(1, 0) })
 	for _, id := range []tailnetAccountIdentity{
 		{}, userID("bad.network", "a"), userID(strings.Repeat("n", 65), "a"),
-		accountID("network", "user", "shared"), accountID("network", "user", "h1_"+strings.Repeat("a", 63)),
-		accountID("network", "user", "h1_"+strings.Repeat("a", 65)), accountID("network", "user", "h1_"+strings.Repeat("A", 64)),
+		accountID("network", "user", ""), accountID("network", "user", " leading"),
+		accountID("network", "user", strings.Repeat("雪", 342)), accountID("network", "user", "a\nb"),
 		accountID("network", "tagged", "other"), accountID("network", "unknown", "shared"),
 	} {
 		if r.admitAccount(id) || r.allowAccount(id, 0, true) {

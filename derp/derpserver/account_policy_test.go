@@ -11,37 +11,57 @@ func accountLeaf(up, down int) string {
 }
 
 func accountConfig(parent, child string) string {
-	return `{"tailnets":{"network":{"upload_bytes_per_second":` + parent + `,"download_bytes_per_second":` + parent + `,"accounts":{"default":` + child + `,"tagged":` + child + `}}}}`
+	return `{"tailnets":{"network":{"upload_bytes_per_second":` + parent + `,"download_bytes_per_second":` + parent + `,"accounts":{"default":` + child + `}}}}`
 }
 
-// Given an optional accounts object, require complete nonrecursive leaves and
-// exact opaque override keys; network overrides must not inherit accounts.
+func TestAccountPlainOverride(t *testing.T) {
+	user := "合成.User+\"别名\\@example.test"
+	leaf := accountLeaf(3750000, 3750000)
+	raw := fmt.Sprintf(`{"tailnets":{"network":{"upload_bytes_per_second":0,"download_bytes_per_second":0,"accounts":{"default":%s,"overrides":{%q:%s}}}}}`, leaf, user, accountLeaf(0, 0))
+	cfg := parseAccountConfig(t, raw)
+	policy, ok := cfg.accountPolicyFor(accountID("network", "user", user))
+	if !ok || policy.upload != 0 || policy.download != 0 {
+		t.Fatal("exact plain account override did not match")
+	}
+	for _, other := range []string{strings.ToLower(user), "other@example.test"} {
+		policy, ok := cfg.accountPolicyFor(accountID("network", "user", other))
+		if !ok || policy.upload != 3750000 || policy.download != 3750000 {
+			t.Fatal("override leaked or default changed")
+		}
+	}
+}
+
+// Account policy accepts exact registering users, not network-subject syntax.
 func TestAccountPolicySchema(t *testing.T) {
 	leaf := accountLeaf(1, 0)
 	valid := accountConfig("1", leaf)
 	for _, tc := range []struct {
-		name, input string
-		valid       bool
+		name, accounts string
+		valid          bool
 	}{
-		{"complete", valid, true},
-		{"zero", accountConfig("0", accountLeaf(0, 0)), true},
-		{"optional overrides", strings.Replace(valid, `"tagged":`, `"overrides":{},"tagged":`, 1), true},
-		{"override", strings.Replace(valid, `"tagged":`, `"overrides":{"h1_`+strings.Repeat("a", 64)+`":`+leaf+`},"tagged":`, 1), true},
-		{"null", strings.Replace(valid, `{"default":`+leaf+`,"tagged":`+leaf+`}`, `null`, 1), false},
-		{"empty", strings.Replace(valid, `{"default":`+leaf+`,"tagged":`+leaf+`}`, `{}`, 1), false},
-		{"missing tagged", strings.Replace(valid, `,"tagged":`+leaf, ``, 1), false},
-		{"missing default", strings.Replace(valid, `"default":`+leaf+`,`, ``, 1), false},
-		{"recursive leaf", strings.Replace(valid, `"default":`+leaf, `"default":{"upload_bytes_per_second":1,"download_bytes_per_second":0,"accounts":{}}`, 1), false},
-		{"bad override", strings.Replace(valid, `"tagged":`, `"overrides":{"user":`+leaf+`},"tagged":`, 1), false},
-		{"partial override", strings.Replace(valid, `"tagged":`, `"overrides":{"h1_`+strings.Repeat("a", 64)+`":{"upload_bytes_per_second":1}},"tagged":`, 1), false},
-		{"null overrides", strings.Replace(valid, `"tagged":`, `"overrides":null,"tagged":`, 1), false},
-		{"unknown", strings.Replace(valid, `"tagged":`, `"other":0,"tagged":`, 1), false},
-		{"duplicate", strings.Replace(valid, `"tagged":`, `"default":`+leaf+`,"tagged":`, 1), false},
+		{"complete", `{"default":` + leaf + `}`, true},
+		{"optional overrides", `{"default":` + leaf + `,"overrides":{}}`, true},
+		{"override", `{"default":` + leaf + `,"overrides":{"User+alias@example.test":` + leaf + `}}`, true},
+		{"null", `null`, false},
+		{"empty", `{}`, false},
+		{"obsolete tagged leaf", `{"default":` + leaf + `,"tagged":` + leaf + `}`, false},
+		{"missing default", `{"overrides":{}}`, false},
+		{"recursive leaf", `{"default":{"upload_bytes_per_second":1,"download_bytes_per_second":0,"accounts":{}}}`, false},
+		{"bad override", `{"default":` + leaf + `,"overrides":{" user":` + leaf + `}}`, false},
+		{"partial override", `{"default":` + leaf + `,"overrides":{"user":{"upload_bytes_per_second":1}}}`, false},
+		{"null overrides", `{"default":` + leaf + `,"overrides":null}`, false},
+		{"unknown", `{"default":` + leaf + `,"other":0}`, false},
+		{"duplicate", `{"default":` + leaf + `,"default":` + leaf + `}`, false},
+		{"duplicate decoded account", `{"default":` + leaf + `,"overrides":{"u@example.test":` + leaf + `,"\u0075@example.test":` + leaf + `}}`, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := parseTailnetRateConfig([]byte(tc.input))
+			input := strings.Replace(valid, `{"default":`+leaf+`}`, tc.accounts, 1)
+			_, err := parseTailnetRateConfig([]byte(input))
 			if (err == nil) != tc.valid {
 				t.Fatalf("valid=%v err=%v", tc.valid, err)
+			}
+			if tc.name == "duplicate decoded account" && strings.Contains(err.Error(), "u@example.test") {
+				t.Fatal("account leaked in reload diagnostic")
 			}
 		})
 	}

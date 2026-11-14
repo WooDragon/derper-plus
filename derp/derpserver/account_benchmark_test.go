@@ -4,7 +4,6 @@
 package derpserver
 
 import (
-	"crypto/sha256"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -26,15 +25,14 @@ func accountBenchFixture(tb testing.TB, count int, children bool) (*tailnetRateR
 	leaf := tailnetRatePolicy{upload: maxTailnetRateValue, download: maxTailnetRateValue, burst: maxTailnetRateValue}
 	parent := leaf
 	if children {
-		parent.accounts = &tailnetAccountPolicies{defaultPolicy: leaf, tagged: leaf, overrides: make(map[string]tailnetRatePolicy)}
+		parent.accounts = &tailnetAccountPolicies{defaultPolicy: leaf, overrides: make(map[string]tailnetRatePolicy)}
 	}
 	cfg := tailnetRateConfig{policies: map[string]tailnetRatePolicy{"network-a": parent}}
 	now := time.Unix(1000, 0)
 	registry := newTailnetRateRegistry(cfg, func() time.Time { return now })
 	ids := make([]tailnetAccountIdentity, count)
 	for i := range ids {
-		digest := sha256.Sum256([]byte(fmt.Sprint(i)))
-		ids[i] = tailnetAccountIdentity{network: "network-a", kind: "user", key: fmt.Sprintf("h1_%x", digest)}
+		ids[i] = tailnetAccountIdentity{network: "network-a", kind: "user", key: fmt.Sprintf("user%d@synthetic.test", i)}
 		if !registry.admitAccount(ids[i]) {
 			tb.Fatal("fixture admission denied")
 		}
@@ -75,7 +73,7 @@ func TestAccountBenchmarkModel(t *testing.T) {
 	for _, children := range []bool{false, true} {
 		real, ids := accountBenchFixture(t, 2, children)
 		model, _ := accountBenchFixture(t, 2, children)
-		missing := tailnetAccountIdentity{network: "network-a", kind: "user", key: fmt.Sprintf("h1_%064x", 99)}
+		missing := tailnetAccountIdentity{network: "network-a", kind: "user", key: "missing@synthetic.test"}
 		for _, id := range []tailnetAccountIdentity{ids[0], ids[1], missing, {}} {
 			for _, size := range []int{1200, -1, maxTailnetRateValue, 0} {
 				for _, upload := range []bool{true, false} {
@@ -146,7 +144,7 @@ func accountBenchConfigFile(tb testing.TB, registry *tailnetRateRegistry) string
 	tb.Helper()
 	path := filepath.Join(tb.TempDir(), "rates.json")
 	leaf := `{"upload_bytes_per_second":2147483647,"download_bytes_per_second":2147483647,"burst_bytes":2147483647}`
-	data := `{"tailnets":{"network-a":{"upload_bytes_per_second":2147483647,"download_bytes_per_second":2147483647,"burst_bytes":2147483647,"accounts":{"default":` + leaf + `,"tagged":` + leaf + `}}}}`
+	data := `{"tailnets":{"network-a":{"upload_bytes_per_second":2147483647,"download_bytes_per_second":2147483647,"burst_bytes":2147483647,"accounts":{"default":` + leaf + `}}}}`
 	if err := os.WriteFile(path, []byte(data), 0600); err != nil {
 		tb.Fatal(err)
 	}

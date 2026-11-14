@@ -1,10 +1,6 @@
 package derpserver
 
 import (
-	"bytes"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"io"
 	"os"
@@ -66,7 +62,7 @@ func TestAccountAdmissionSharedFixture(t *testing.T) {
 		{"echo type", strings.Replace(valid, `"`+fixture.NodePublic+`"`, `42`, 1), false},
 		{"network type", strings.Replace(valid, `"network-0"`, `42`, 1), false},
 		{"kind type", strings.Replace(valid, `"user"`, `42`, 1), false},
-		{"key type", strings.Replace(valid, `"Key":"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987"`, `"Key":42`, 1), false},
+		{"key type", strings.Replace(valid, `"Key":"Synthetic.User@example.test"`, `"Key":42`, 1), false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := parseAccountAdmission(strings.NewReader(tc.raw), node)
@@ -83,44 +79,53 @@ func TestAccountAdmissionReadFailure(t *testing.T) {
 	}
 }
 
-func TestAccountSyntheticVectors(t *testing.T) {
-	data, err := os.ReadFile(filepath.Join("testdata", "account-vectors.json"))
-	if err != nil {
-		t.Fatal(err)
+func TestAccountUserValidation(t *testing.T) {
+	for _, user := range []string{"User+alias@example.test", "合成\"用户\\@example.test", "é", "é", strings.Repeat("雪", 341) + "a", "shared"} {
+		if !validAccountKey(user) {
+			t.Fatal("valid registering user rejected")
+		}
 	}
-	var fixture struct {
-		Synthetic bool
-		Secret    string
-		Vectors   []struct{ NetworkSubject, User, Message, Key, ContextMessage, Context string }
+	for _, user := range []string{"", " leading", "trailing ", "a\nb", "a\u007fb", "a\u0085b", "\uFEFFuser", strings.Repeat("雪", 342), string([]byte{0xff})} {
+		if validAccountKey(user) {
+			t.Fatal("invalid registering user accepted")
+		}
 	}
-	if err := json.Unmarshal(data, &fixture); err != nil {
-		t.Fatal(err)
-	}
-	if !fixture.Synthetic || len(fixture.Vectors) != 6 {
-		t.Fatal("not six synthetic vectors")
-	}
-	secret, err := hex.DecodeString(fixture.Secret)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, v := range fixture.Vectors {
-		t.Run(v.User+"/"+v.NetworkSubject, func(t *testing.T) {
-			message, err := json.Marshal([]string{"derp-account-v1", v.NetworkSubject, v.User})
-			if err != nil {
-				t.Fatal(err)
+}
+
+// Both callback values and override names must decode without replacement.
+func TestAccountJSONUnicode(t *testing.T) {
+	node := key.NewNode().Public()
+	for _, tc := range []struct {
+		name, raw, want string
+		valid           bool
+	}{
+		{"isolated high", `"\ud800@example.test"`, "", false},
+		{"different isolated high", `"\ud801@example.test"`, "", false},
+		{"isolated low", `"\udc00@example.test"`, "", false},
+		{"surrogate pair", `"\ud83d\ude00@example.test"`, "😀@example.test", true},
+		{"literal replacement", `"�@example.test"`, "�@example.test", true},
+		{"escaped replacement", `"\ufffd@example.test"`, "�@example.test", true},
+		{"literal escape text", `"\\ud800@example.test"`, `\ud800@example.test`, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			wire := `{"Allow":true,"IdentityVersion":2,"Identity":{"NodePublic":"` + node.String() + `","RateLimitSubject":"network","Account":{"Kind":"user","Key":` + tc.raw + `}}}`
+			id, err := parseAccountAdmission(strings.NewReader(wire), node)
+			if (err == nil) != tc.valid {
+				t.Errorf("admission valid=%v err=%v key=%q", tc.valid, err, id.key)
 			}
-			if !bytes.Equal(message, []byte(v.Message)) {
-				t.Fatal("message encoding drift")
+			if tc.valid && id.key != tc.want {
+				t.Error("admission changed account")
 			}
-			mac := hmac.New(sha256.New, secret)
-			mac.Write(message)
-			if got := "h1_" + hex.EncodeToString(mac.Sum(nil)); got != v.Key || !validAccountKey(got) {
-				t.Fatal("cross-language key drift")
+			policy := `{"tailnets":{"network":{"upload_bytes_per_second":0,"download_bytes_per_second":0,"accounts":{"default":` + accountLeaf(3750000, 3750000) + `,"overrides":{` + tc.raw + `:` + accountLeaf(0, 0) + `}}}}}`
+			cfg, err := parseTailnetRateConfig([]byte(policy))
+			if (err == nil) != tc.valid {
+				t.Errorf("override valid=%v err=%v", tc.valid, err)
 			}
-			mac.Reset()
-			mac.Write([]byte(v.ContextMessage))
-			if hex.EncodeToString(mac.Sum(nil)) != v.Context {
-				t.Fatal("context drift")
+			if tc.valid {
+				leaf, ok := cfg.accountPolicyFor(accountID("network", "user", tc.want))
+				if !ok || leaf.upload != 0 || leaf.download != 0 {
+					t.Error("exact Unicode override did not match")
+				}
 			}
 		})
 	}

@@ -82,7 +82,7 @@ func accountTCPConfig(parent, child int, direction string) string {
 	} else {
 		down = child
 	}
-	network := fmt.Sprintf(`{"upload_bytes_per_second":%d,"download_bytes_per_second":%d,"accounts":{"default":%s,"tagged":%s}}`, parent, parent, accountLeaf(up, down), accountLeaf(up, down))
+	network := fmt.Sprintf(`{"upload_bytes_per_second":%d,"download_bytes_per_second":%d,"accounts":{"default":%s}}`, parent, parent, accountLeaf(up, down))
 	return `{"tailnets":{"network":` + network + `,"other":` + network + `,"free":` + accountLeaf(0, 0) + `}}`
 }
 
@@ -92,7 +92,7 @@ func TestAccountTCPPayloadPolicing(t *testing.T) {
 	for _, direction := range []string{"upload", "download"} {
 		t.Run(direction, func(t *testing.T) {
 			a, b, c, tag1, tag2, other, free := key.NewNode(), key.NewNode(), key.NewNode(), key.NewNode(), key.NewNode(), key.NewNode(), key.NewNode()
-			identities := map[key.NodePublic]tailnetAccountIdentity{a.Public(): userID("network", "a"), b.Public(): userID("network", "a"), c.Public(): userID("network", "b"), tag1.Public(): accountID("network", "tagged", "shared"), tag2.Public(): accountID("network", "tagged", "shared"), other.Public(): userID("other", "a"), free.Public(): userID("free", "f")}
+			identities := map[key.NodePublic]tailnetAccountIdentity{a.Public(): userID("network", "a"), b.Public(): userID("network", "a"), c.Public(): userID("network", "b"), tag1.Public(): userID("network", "tagged-registrant"), tag2.Public(): userID("network", "tagged-registrant"), other.Public(): userID("other", "a"), free.Public(): userID("free", "f")}
 			h := newAccountTCPHarness(t, accountTCPConfig(0, 1, direction), identities, 2)
 			ca, cb, cc, ct1, ct2, co, cf := h.connect(t, a, true), h.connect(t, b, true), h.connect(t, c, true), h.connect(t, tag1, true), h.connect(t, tag2, true), h.connect(t, other, true), h.connect(t, free, true)
 			sequence := byte(0)

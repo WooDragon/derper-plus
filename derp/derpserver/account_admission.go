@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"strconv"
+	"unicode/utf8"
 
 	"tailscale.com/types/key"
 )
@@ -26,6 +28,38 @@ func exactIdentityObject(raw []byte, names ...string) (map[string]json.RawMessag
 		}
 	}
 	return fields, nil
+}
+
+// encoding/json replaces malformed UTF-8 and unpaired surrogate escapes with
+// U+FFFD. Reject those before decoding account values or override names; valid
+// U+FFFD and escaped backslash text must retain their distinct identities.
+func validAccountJSONUnicode(raw []byte) bool {
+	if !utf8.Valid(raw) || !json.Valid(raw) {
+		return false
+	}
+	for i := 0; i < len(raw); i++ {
+		if raw[i] != '\\' {
+			continue
+		}
+		i++
+		if raw[i] != 'u' {
+			continue
+		}
+		code, _ := strconv.ParseUint(string(raw[i+1:i+5]), 16, 16)
+		i += 4
+		if code < 0xd800 || code > 0xdfff {
+			continue
+		}
+		if code > 0xdbff || i+6 >= len(raw) || raw[i+1] != '\\' || raw[i+2] != 'u' {
+			return false
+		}
+		low, _ := strconv.ParseUint(string(raw[i+3:i+7]), 16, 16)
+		if low < 0xdc00 || low > 0xdfff {
+			return false
+		}
+		i += 6
+	}
+	return true
 }
 
 func parseAccountAdmission(reader io.Reader, node key.NodePublic) (tailnetAccountIdentity, error) {
@@ -64,6 +98,9 @@ func parseAccountAdmission(reader io.Reader, node key.NodePublic) (tailnetAccoun
 	}
 	if err := json.Unmarshal(account["Kind"], &id.kind); err != nil {
 		return id, errors.New("invalid account kind")
+	}
+	if !validAccountJSONUnicode(account["Key"]) {
+		return id, errors.New("invalid account key Unicode")
 	}
 	if err := json.Unmarshal(account["Key"], &id.key); err != nil {
 		return id, errors.New("invalid account key")

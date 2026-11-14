@@ -14,19 +14,7 @@
       "RateLimitSubject": "network-0",
       "Account": {
         "Kind": "user",
-        "Key": "h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987"
-      }
-    }
-  },
-  "taggedAllow": {
-    "Allow": true,
-    "IdentityVersion": 2,
-    "Identity": {
-      "NodePublic": "nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "RateLimitSubject": "network-0",
-      "Account": {
-        "Kind": "tagged",
-        "Key": "shared"
+        "Key": "Synthetic.User@example.test"
       }
     }
   },
@@ -37,11 +25,11 @@
     {
       "name": "user",
       "valid": true,
-      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"}}}"
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"Synthetic.User@example.test\"}}}"
     },
     {
       "name": "tagged",
-      "valid": true,
+      "valid": false,
       "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"tagged\",\"Key\":\"shared\"}}}"
     },
     {
@@ -52,57 +40,57 @@
     {
       "name": "downgraded-v1",
       "valid": false,
-      "raw": "{\"Allow\":true,\"IdentityVersion\":1,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"}}}"
+      "raw": "{\"Allow\":true,\"IdentityVersion\":1,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"Synthetic.User@example.test\"}}}"
     },
     {
       "name": "version-2.0",
       "valid": false,
-      "raw": "{\"Allow\":true,\"IdentityVersion\":2.0,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"}}}"
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2.0,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"Synthetic.User@example.test\"}}}"
     },
     {
       "name": "version-2e0",
       "valid": false,
-      "raw": "{\"Allow\":true,\"IdentityVersion\":2e0,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"}}}"
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2e0,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"Synthetic.User@example.test\"}}}"
     },
     {
       "name": "version-\"2\"",
       "valid": false,
-      "raw": "{\"Allow\":true,\"IdentityVersion\":\"2\",\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"}}}"
+      "raw": "{\"Allow\":true,\"IdentityVersion\":\"2\",\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"Synthetic.User@example.test\"}}}"
     },
     {
       "name": "version-null",
       "valid": false,
-      "raw": "{\"Allow\":true,\"IdentityVersion\":null,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"}}}"
+      "raw": "{\"Allow\":true,\"IdentityVersion\":null,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"Synthetic.User@example.test\"}}}"
     },
     {
       "name": "duplicate-version",
       "valid": false,
-      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"}},\"Identity\\u0056ersion\":2}"
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"Synthetic.User@example.test\"}},\"Identity\\u0056ersion\":2}"
     },
     {
       "name": "duplicate-account",
       "valid": false,
-      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"K\\u0069nd\":\"tagged\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"}}}"
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"K\\u0069nd\":\"tagged\",\"Key\":\"Synthetic.User@example.test\"}}}"
     },
     {
       "name": "duplicate-identity",
       "valid": false,
-      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"}},\"Identity\":{}}"
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"Synthetic.User@example.test\"}},\"Identity\":{}}"
     },
     {
       "name": "extra-top",
       "valid": false,
-      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"}},\"Unexpected\":true}"
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"Synthetic.User@example.test\"}},\"Unexpected\":true}"
     },
     {
       "name": "extra-identity",
       "valid": false,
-      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"},\"Unexpected\":true}}"
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"Synthetic.User@example.test\"},\"Unexpected\":true}}"
     },
     {
       "name": "extra-account",
       "valid": false,
-      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\",\"Unexpected\":true}}}"
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"Synthetic.User@example.test\",\"Unexpected\":true}}}"
     },
     {
       "name": "unknown",
@@ -110,19 +98,19 @@
       "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"unknown\"}}}"
     },
     {
-      "name": "short-key",
+      "name": "empty-key",
       "valid": false,
-      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_bad\"}}}"
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"\"}}}"
     },
     {
       "name": "wrong-tagged",
       "valid": false,
-      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"tagged\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"}}}"
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"tagged\",\"Key\":\"Synthetic.User@example.test\"}}}"
     },
     {
-      "name": "uppercase-key",
+      "name": "leading-space-key",
       "valid": false,
-      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"H1_596E6E2F00EF312162A11E49AEE4FEFD8F46B9AD117DC26307BBE80C6401F987\"}}}"
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\" Synthetic.User@example.test\"}}}"
     },
     {
       "name": "missing-key",
@@ -137,22 +125,22 @@
     {
       "name": "wrong-echo",
       "valid": false,
-      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"}}}"
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"Synthetic.User@example.test\"}}}"
     },
     {
       "name": "noncanonical-echo",
       "valid": false,
-      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"NODEKEY:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"}}}"
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"NODEKEY:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"Synthetic.User@example.test\"}}}"
     },
     {
       "name": "oversize",
       "valid": false,
-      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"}}}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 "
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"Synthetic.User@example.test\"}}}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 "
     },
     {
       "name": "trailing",
       "valid": false,
-      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"}}}{}"
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"Synthetic.User@example.test\"}}}{}"
     }
   ],
   "requests": [
