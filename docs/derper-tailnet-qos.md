@@ -31,7 +31,8 @@ Mesh forwarding avoids a second upload charge at the receiving relay; delivery
 to its local client still consumes that client's subject download allowance.
 Ordinary third parties shall not receive mesh keys for admission.
 
-The callback sends `NodePublic`, `Source`, and the literal `IdentityVersion: 1`.
+By default, the callback sends `NodePublic`, `Source`, and literal `IdentityVersion: 1`.
+The fixed opt-in account capability below selects literal version 2 instead.
 An allowing response must contain a matching node-key echo and a valid subject.
 The DERP handshake still proves possession of the node's private key. Local
 WhoIs, source addresses, user ownership, and old owner exceptions do not supply
@@ -112,6 +113,109 @@ nor used as fallback. Before the first successful complete refresh, both wire
 paths can cold-deny. Infinite last-known-good retention still enforces device
 expiry and can delay revocation indefinitely. A health response alone does not
 prove admission readiness. No existing connection is revoked by a refresh.
+
+## Optional account layer (local increment, not deployed)
+
+Before configuring this increment, read the
+[account contract in the ADR](adr-derper-tailnet-aggregate-rate-limit.md#account-aggregation-increment-2026-11-14-local-only).
+The parent-only callback above remains v1 by default. The new
+`--tailnet-account-identity` capability defaults to false and is fixed at startup.
+False rejects every `accounts` entry at initial load or reload. True requires
+`--tailnet-rate-config` and full v2 evidence for all non-mesh clients, including
+networks whose policy has no account layer. SIGHUP cannot change the capability.
+Missing/unknown account evidence rejects v2; it never falls back to v1.
+
+The following policy uses a synthetic fixture key and fictitious subject. It is
+an interface example, not production configuration or a rollout command:
+
+```json
+{
+  "tailnets": {
+    "network-0": {
+      "upload_bytes_per_second": 10485760,
+      "download_bytes_per_second": 10485760,
+      "accounts": {
+        "default": {
+          "upload_bytes_per_second": 1048576,
+          "download_bytes_per_second": 1048576
+        },
+        "overrides": {
+          "h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987": {
+            "upload_bytes_per_second": 0,
+            "download_bytes_per_second": 0
+          }
+        },
+        "tagged": {
+          "upload_bytes_per_second": 1048576,
+          "download_bytes_per_second": 1048576
+        }
+      }
+    }
+  }
+}
+```
+
+`accounts.default` and `accounts.tagged` are mandatory when accounts is present;
+`overrides` may be omitted. Overrides replace complete leaves. Leaf integer and
+burst validation matches the parent, and nested accounts is invalid. An exact
+network policy without accounts does not inherit the top-level default's
+accounts. Override keys are 67-character `h1_` user keys, not network subjects.
+The `accounts.tagged` leaf in this example is required compatibility policy for
+existing `tagged/shared` evidence, not the new Worker's production classification.
+The new Worker derives `Kind:user` for both tagged and untagged devices from
+valid `Devices.user`, the registering account rather than the current owner.
+Devices with the same `(network,user)` share the unchanged HMAC key and bucket.
+Tags do not affect rate classification. These identities select a user override
+or `accounts.default`, not `accounts.tagged`. The server continues to accept
+`tagged/shared` and applies the separate compatibility leaf to that identity.
+
+In the example, the zero-rate user still obeys the network's 10485760-byte/s
+parent in each direction. A zero parent with a finite child obeys the child;
+only two zero layers remove both limits. A denied parent stays denied. Both
+finite layers must allow before either is debited. Different accounts compete
+for the parent; the policer does not guarantee fairness or minimum bandwidth.
+
+A true-capability process may add, tighten, close, and reopen accounts by valid
+policy reload while connections retain their admitted identity. Parent and
+child balances follow the ADR's freeze/resume/no-refill rules. Closing accounts
+retains historical child buckets. Reconnects do not replenish balances; buckets
+are not garbage-collected. Mode changes require a different process, not an
+empty policy or a reload.
+
+The admission service derives user keys using a secret HMAC over the exact JSON
+array defined in the ADR. Missing or invalid `Devices.user` yields unknown account
+evidence and rejects v2; tags do not provide a fallback. Valid legacy/v1 membership
+remains unchanged. Operators shall not substitute raw user/email strings
+or infer keys from local WhoIs. The companion offline tool reads stdin JSON
+only; its actual usage is documented with that service. No production account
+secret was generated or uploaded. Protected backup, recovery, prewarming, and
+coordinated migration require separate approval. Secret rotation is not
+transparent: it changes account keys/overrides/bucket identity while old
+connections retain old identities. Infinite LKG retention can delay revocation
+indefinitely, and user-string changes or reuse can alter attribution.
+
+Existing shared snapshots with a valid context remain legal, and a failed
+refresh retains their LKG. Before a consumer cutover, every configured source
+shall complete a real successful refresh under the new Worker. Operators shall
+then read back v2 `Kind:user` and confirm identical keys for tagged and untagged
+devices with the same registering account. Health responses, valid context, or
+old shared evidence do not establish that readiness. These are prerequisites,
+not authorization for production actions.
+
+The registering-account correction passed 298 Worker unit tests, 84 real-workerd
+tests, and 30 joint scenarios with zero skips. Five top-level Go compatibility
+tests and 44 subtests passed. The joint runner reclaimed all ten listeners with
+zero cleanup errors. Independent redteam review of the five-file implementation
+and test increment returned APPROVED with no required fixes; it did not review
+this documentation update or authorize rollout. Earlier full Go/race and
+performance results remain historical evidence, not reruns for this correction.
+
+The dated local results, fixed old-Worker commit, and accepted reload-cost
+limitation are retained in
+[Issue #12](https://github.com/WooDragon/derper-plus/issues/12). The existing
+writer-flood test-oracle defect is independently tracked in
+[Issue #13](https://github.com/WooDragon/derper-plus/issues/13); it is not fixed by
+this increment. No account-layer commit, release, or deployment is claimed.
 
 ## Local verification and release boundary
 

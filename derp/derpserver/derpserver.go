@@ -229,6 +229,8 @@ type Server struct {
 	// tailnetRate is an independent startup-selected mode; the pointer remains
 	// stable while its registry atomically reloads configuration and balances.
 	tailnetRate *tailnetRateRegistry
+	// Frozen before registry initialization or the first Accept, under mu.
+	tailnetAccountIdentity bool
 
 	mu       syncs.Mutex // guards the following fields
 	closed   bool
@@ -1207,6 +1209,7 @@ func (s *Server) accept(ctx context.Context, nc derp.Conn, brw *bufio.ReadWriter
 		userRate:           s.userRate,
 		userRateSubject:    subject.user,
 		tailnetRateSubject: subject.tailnet,
+		tailnetAccount:     subject.account,
 	}
 	c.runWriterFunc = c.runWriter // allocate the method value once, not per wake
 
@@ -1569,6 +1572,9 @@ func (c *sclient) allowUserRateUpload(size int) bool {
 		return true
 	}
 	if c.s.tailnetRate != nil {
+		if c.s.tailnetAccountIdentity {
+			return c.s.tailnetRate.allowAccount(c.tailnetAccount, size, true)
+		}
 		return c.s.tailnetRate.allow(c.tailnetRateSubject, size, true)
 	}
 	return c.userRate == nil || c.userRate.allowUpload(c.userRateSubject, size)
@@ -1579,6 +1585,9 @@ func (c *sclient) allowUserRateDownload(size int) bool {
 		return true
 	}
 	if c.s.tailnetRate != nil {
+		if c.s.tailnetAccountIdentity {
+			return c.s.tailnetRate.allowAccount(c.tailnetAccount, size, false)
+		}
 		return c.s.tailnetRate.allow(c.tailnetRateSubject, size, false)
 	}
 	return c.userRate == nil || c.userRate.allowDownload(c.userRateSubject, size)
@@ -1838,6 +1847,9 @@ func (s *Server) verifyClient(ctx context.Context, clientKey key.NodePublic, inf
 	}
 	if s.tailnetRate != nil {
 		return s.verifyTailnetClient(ctx, clientKey, clientIP)
+	}
+	if s.tailnetAccountIdentity {
+		return admissionResult{}, userRateAdmissionError("account identity requires tailnet rate mode")
 	}
 	subject, err := s.verifyLegacyClient(ctx, clientKey, info, clientIP)
 	return admissionResult{user: subject}, err
@@ -2178,6 +2190,7 @@ type sclient struct {
 	userRate           *userRateRegistry
 	userRateSubject    userRateSubject
 	tailnetRateSubject string
+	tailnetAccount     tailnetAccountIdentity
 
 	// Owned by run, not thread-safe.
 	br          *bufio.Reader

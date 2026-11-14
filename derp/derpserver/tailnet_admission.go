@@ -21,6 +21,7 @@ import (
 type admissionResult struct {
 	user    userRateSubject
 	tailnet string
+	account tailnetAccountIdentity
 }
 
 type tailnetAdmissionRequest struct {
@@ -75,7 +76,11 @@ func (s *Server) verifyTailnetClient(ctx context.Context, node key.NodePublic, s
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	data, err := json.Marshal(tailnetAdmissionRequest{NodePublic: node, Source: source, IdentityVersion: 1})
+	version := 1
+	if s.tailnetAccountIdentity {
+		version = 2
+	}
+	data, err := json.Marshal(tailnetAdmissionRequest{NodePublic: node, Source: source, IdentityVersion: version})
 	if err != nil {
 		return reject()
 	}
@@ -91,6 +96,13 @@ func (s *Server) verifyTailnetClient(ctx context.Context, node key.NodePublic, s
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
 		return reject()
+	}
+	if s.tailnetAccountIdentity {
+		id, err := parseAccountAdmission(res.Body, node)
+		if err != nil || !s.tailnetRate.admitAccount(id) {
+			return reject()
+		}
+		return admissionResult{tailnet: id.network, account: id}, nil
 	}
 	subject, err := parseTailnetAdmission(res.Body, node)
 	if err != nil {

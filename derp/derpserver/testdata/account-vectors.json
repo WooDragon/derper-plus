@@ -1,0 +1,54 @@
+{
+  "synthetic": true,
+  "secret": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "vectors": [
+    {
+      "networkSubject": "network-0",
+      "user": "Synthetic.User@example.test",
+      "message": "[\"derp-account-v1\",\"network-0\",\"Synthetic.User@example.test\"]",
+      "key": "h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987",
+      "contextMessage": "[\"derp-account-context-v1\",\"network-0\"]",
+      "context": "1f659c0a5c8a13dc5505a3cadc85dd41de6e050be4a4b39fc6b394d10d20931c"
+    },
+    {
+      "networkSubject": "network-1",
+      "user": "Synthetic.User@example.test",
+      "message": "[\"derp-account-v1\",\"network-1\",\"Synthetic.User@example.test\"]",
+      "key": "h1_a8b48da42b35fb63d8b0376393731202c2afb00aa8769c53aa8e468bb52abdd0",
+      "contextMessage": "[\"derp-account-context-v1\",\"network-1\"]",
+      "context": "f3e591dfdb3c628da74d0406cee36e015df50a2bdecd0d54445b8f89b3d00f19"
+    },
+    {
+      "networkSubject": "network-0",
+      "user": "synthetic.user@example.test",
+      "message": "[\"derp-account-v1\",\"network-0\",\"synthetic.user@example.test\"]",
+      "key": "h1_ce9ac22e0238a240dd0f7b53524b6c81a70b44e8df38bdc83c543288d9998200",
+      "contextMessage": "[\"derp-account-context-v1\",\"network-0\"]",
+      "context": "1f659c0a5c8a13dc5505a3cadc85dd41de6e050be4a4b39fc6b394d10d20931c"
+    },
+    {
+      "networkSubject": "network-0",
+      "user": "合成\"用户\\@example.test",
+      "message": "[\"derp-account-v1\",\"network-0\",\"合成\\\"用户\\\\@example.test\"]",
+      "key": "h1_2712918f0957ea40fb67c3cbc527e3900e1d32c7ababa5c2a347b5d327377c5d",
+      "contextMessage": "[\"derp-account-context-v1\",\"network-0\"]",
+      "context": "1f659c0a5c8a13dc5505a3cadc85dd41de6e050be4a4b39fc6b394d10d20931c"
+    },
+    {
+      "networkSubject": "network-0",
+      "user": "é",
+      "message": "[\"derp-account-v1\",\"network-0\",\"é\"]",
+      "key": "h1_157afd0d90b4201958138aa4f718723e4c86f35e0151c582e8c9748e90139a59",
+      "contextMessage": "[\"derp-account-context-v1\",\"network-0\"]",
+      "context": "1f659c0a5c8a13dc5505a3cadc85dd41de6e050be4a4b39fc6b394d10d20931c"
+    },
+    {
+      "networkSubject": "network-0",
+      "user": "é",
+      "message": "[\"derp-account-v1\",\"network-0\",\"é\"]",
+      "key": "h1_3bd3897c3e11909e5381f55770cea28440a3a1bdabd60b1937f0df80a964505e",
+      "contextMessage": "[\"derp-account-context-v1\",\"network-0\"]",
+      "context": "1f659c0a5c8a13dc5505a3cadc85dd41de6e050be4a4b39fc6b394d10d20931c"
+    }
+  ]
+}

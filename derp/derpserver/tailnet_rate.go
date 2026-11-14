@@ -90,14 +90,15 @@ func (b *tailnetRateBuckets) update(policy tailnetRatePolicy, applicable, first 
 // The mutex linearizes admission, both directions, and complete reloads; no I/O
 // or callbacks other than the local clock occur while it is held.
 type tailnetRateRegistry struct {
-	mu      sync.Mutex
-	config  tailnetRateConfig
-	buckets map[string]*tailnetRateBuckets
-	now     func() time.Time
+	mu       sync.Mutex
+	config   tailnetRateConfig
+	buckets  map[string]*tailnetRateBuckets
+	accounts map[tailnetAccountIdentity]*tailnetRateBuckets
+	now      func() time.Time
 }
 
 func newTailnetRateRegistry(cfg tailnetRateConfig, now func() time.Time) *tailnetRateRegistry {
-	return &tailnetRateRegistry{config: cfg, buckets: make(map[string]*tailnetRateBuckets), now: now}
+	return &tailnetRateRegistry{config: cfg, buckets: make(map[string]*tailnetRateBuckets), accounts: make(map[tailnetAccountIdentity]*tailnetRateBuckets), now: now}
 }
 
 func (r *tailnetRateRegistry) admit(subject string) bool {
@@ -121,6 +122,10 @@ func (r *tailnetRateRegistry) apply(cfg tailnetRateConfig) {
 	now := r.now()
 	for subject, buckets := range r.buckets {
 		policy, applicable := cfg.policyFor(subject)
+		buckets.update(policy, applicable, false, now)
+	}
+	for id, buckets := range r.accounts {
+		policy, applicable := cfg.accountPolicyFor(id)
 		buckets.update(policy, applicable, false, now)
 	}
 	r.config = cfg
