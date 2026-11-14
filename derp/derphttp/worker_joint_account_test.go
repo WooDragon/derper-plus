@@ -4,8 +4,10 @@
 package derphttp_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http/httptest"
 	"os"
@@ -266,35 +268,71 @@ func (h *jointHarness) accountPulse(t *testing.T, sender, receiver *jointClient,
 	t.Helper()
 	tick := time.NewTicker(25 * time.Millisecond)
 	defer tick.Stop()
-	stopSending := time.NewTimer(250 * time.Millisecond)
+	now := time.Now()
+	sent, delivered, err := jointAccountPulse(sender, receiver.packets, h.keys["free"].Public(), h.keys[source].Public(), tick.C, now.Add(250*time.Millisecond), now.Add(500*time.Millisecond))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("reload probe: %d numbered packets sent, %d delivered", sent, delivered)
+	return delivered
+}
+
+func jointAccountPulse(sender *jointClient, packets <-chan jointPacket, destination, source key.NodePublic, ticks <-chan time.Time, stopAt, finishAt time.Time) (sent, delivered int, err error) {
+	stopSending := time.NewTimer(time.Until(stopAt))
 	defer stopSending.Stop()
-	deadline := time.NewTimer(500 * time.Millisecond)
+	deadline := time.NewTimer(time.Until(finishAt))
 	defer deadline.Stop()
-	var sent byte
-	delivered := 0
+	// Eight full packets cap this probe at 512 KiB of payload, regardless of
+	// queued ticks or scheduling delays. No asynchronous Send can outlive it.
+	const packetBudget = 8
+	writeDeadline := stopAt
+	if finishAt.Before(writeDeadline) {
+		writeDeadline = finishAt
+	}
+	if err := sender.conn.SetWriteDeadline(writeDeadline); err != nil {
+		return 0, 0, err
+	}
+	defer func() { err = errors.Join(err, sender.conn.SetWriteDeadline(time.Time{})) }()
 	for {
+		if !time.Now().Before(finishAt) {
+			return sent, delivered, nil
+		}
+		if !time.Now().Before(stopAt) || sent == packetBudget {
+			ticks = nil
+		}
 		select {
-		case <-tick.C:
-			sent++
-			h.send(t, sender, "free", 128+sent, derp.MaxPacketSize)
-		case packet := <-receiver.packets:
-			if packet.err != nil {
-				t.Fatal(packet.err)
+		case <-ticks:
+			// A ready stop timer and a queued tick can win select in either order.
+			if !time.Now().Before(writeDeadline) {
+				ticks = nil
+				continue
 			}
-			if packet.source != h.keys[source].Public() || len(packet.data) != derp.MaxPacketSize || packet.data[0] <= 128 || packet.data[0] > 128+sent {
-				t.Fatal("unexpected packet in reload probe train")
+			sent++
+			if err := sender.client.Send(destination, bytes.Repeat([]byte{128 + byte(sent)}, derp.MaxPacketSize)); err != nil {
+				return sent, delivered, err
+			}
+			// derphttp.Send may consume a transport error while scheduling a
+			// reconnect. Expiry is still a failed probe, never a policing drop.
+			if !time.Now().Before(writeDeadline) {
+				return sent, delivered, context.DeadlineExceeded
+			}
+		case packet := <-packets:
+			if packet.err != nil {
+				return sent, delivered, packet.err
+			}
+			if packet.source != source || len(packet.data) != derp.MaxPacketSize || packet.data[0] <= 128 || int(packet.data[0]) > 128+sent {
+				return sent, delivered, fmt.Errorf("unexpected packet in reload probe train")
 			}
 			for _, value := range packet.data {
 				if value != packet.data[0] {
-					t.Fatal("corrupted numbered probe payload")
+					return sent, delivered, fmt.Errorf("corrupted numbered probe payload")
 				}
 			}
 			delivered++
 		case <-stopSending.C:
-			tick.Stop()
+			ticks = nil // Stopping the ticker alone does not discard a queued tick.
 		case <-deadline.C:
-			t.Logf("reload probe: %d numbered packets sent, %d delivered", sent, delivered)
-			return delivered
+			return sent, delivered, nil
 		}
 	}
 }

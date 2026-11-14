@@ -224,8 +224,8 @@ default v1 identity or authorize a rollout.
 ## Account aggregation increment (2026-11-14; local only)
 
 This section extends the parent-only v1 contract above. The account increment
-has passed local verification and independent code review. It is not committed,
-published, or deployed. The user-approved registering-account correction uses
+has passed local verification and independent code review. It is not published
+or deployed. The user-approved registering-account correction uses
 `Devices.user` for both tagged and untagged devices. Its local evidence includes
 298 Worker unit tests, 84 real-workerd tests, 30 joint scenarios with zero skips,
 and five top-level Go compatibility tests with 44 subtests. All ten joint

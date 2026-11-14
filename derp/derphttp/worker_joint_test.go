@@ -8,9 +8,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -138,6 +140,7 @@ func (h *jointHarness) server(t *testing.T, callback, config string, identity bo
 
 type jointClient struct {
 	client  *derphttp.Client
+	conn    net.Conn // Initial held connection; pulse deadlines must reach the actual writer.
 	packets chan jointPacket
 }
 type jointPacket struct {
@@ -148,11 +151,31 @@ type jointPacket struct {
 
 func (h *jointHarness) client(t *testing.T, url, name string, allow bool) *jointClient {
 	t.Helper()
+	return h.clientWithConn(t, url, name, allow, func(conn net.Conn) net.Conn { return conn })
+}
+
+func (h *jointHarness) clientWithConn(t *testing.T, url, name string, allow bool, wrap func(net.Conn) net.Conn) *jointClient {
+	t.Helper()
 	client, err := derphttp.NewClient(h.keys[name], url, t.Logf, netmon.NewStatic())
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { client.Close() })
+	var held net.Conn
+	var dialed atomic.Bool
+	client.SetURLDialer(func(ctx context.Context, network, address string) (net.Conn, error) {
+		// These scenarios require held connections. A reconnect must not
+		// silently replace the transport carrying the pulse write deadline.
+		if dialed.Swap(true) {
+			return nil, fmt.Errorf("joint held-key client attempted reconnect")
+		}
+		conn, err := (&net.Dialer{}).DialContext(ctx, network, address)
+		if err != nil {
+			return nil, err
+		}
+		held = wrap(conn)
+		return held, nil
+	})
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	if err := client.Connect(ctx); err != nil {
@@ -162,7 +185,7 @@ func (h *jointHarness) client(t *testing.T, url, name string, allow bool) *joint
 	if !allow {
 		return nil
 	}
-	c := &jointClient{client: client, packets: make(chan jointPacket, 32)}
+	c := &jointClient{client: client, conn: held, packets: make(chan jointPacket, 32)}
 	done := make(chan struct{})
 	stopped := make(chan struct{})
 	t.Cleanup(func() { close(done); client.Close(); <-stopped })
