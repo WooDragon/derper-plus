@@ -26,7 +26,7 @@ func jointAccountConfig(parentUp, parentDown, childUp, childDown int, accounts b
 	leaf := fmt.Sprintf(`{"upload_bytes_per_second":%d,"download_bytes_per_second":%d}`, childUp, childDown)
 	children := ""
 	if accounts {
-		children = `,"accounts":{"default":` + leaf + `,"tagged":` + leaf + `}`
+		children = `,"accounts":{"default":` + leaf + `}`
 	}
 	return fmt.Sprintf(`{"tailnets":{"network0":{"upload_bytes_per_second":%d,"download_bytes_per_second":%d%s},"network1":{"upload_bytes_per_second":0,"download_bytes_per_second":0%s},"free":{"upload_bytes_per_second":0,"download_bytes_per_second":0}}}`, parentUp, parentDown, children, children)
 }
@@ -69,7 +69,7 @@ func (h *jointHarness) accountScenarios(t *testing.T) {
 	t.Run("v2_conflicting_account_rejected", func(t *testing.T) {
 		h.client(t, h.accountServer(t, h.ready.AccountConflict, noAccounts), "same0", false)
 	})
-	t.Run("v2_new_worker_missing_secret_rejected", func(t *testing.T) { h.client(t, h.accountServer(t, h.ready.Normal, noAccounts), "same0", false) })
+	t.Run("v2_new_worker_missing_account_evidence_rejected", func(t *testing.T) { h.client(t, h.accountServer(t, h.ready.Normal, noAccounts), "same0", false) })
 	t.Run("v2_old_worker_downgrade_rejected", func(t *testing.T) { h.client(t, h.accountServer(t, h.ready.OldWorker, noAccounts), "same0", false) })
 	t.Run("v1_old_worker_extended_snapshot_compatible", func(t *testing.T) {
 		h.client(t, h.server(t, h.ready.OldWorker, jointConfig(0, 0), true), "unknownaccount", true)
@@ -95,7 +95,7 @@ func (h *jointHarness) accountStartupRejected(t *testing.T) {
 	}
 }
 
-// Read the actual Worker response rather than reproducing its HMAC in Go.
+// Read the actual Worker response as the override key, without recreating identity in Go.
 func (h *jointHarness) accountZeroOverride(t *testing.T, config string) string {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join(h.run, "wire-accountNormal.json"))
@@ -111,7 +111,7 @@ func (h *jointHarness) accountZeroOverride(t *testing.T, config string) string {
 		t.Fatal(err)
 	}
 	account := wire.Body.Identity.Account
-	if account.Kind != "user" || !strings.HasPrefix(account.Key, "h1_") || len(account.Key) != 67 {
+	if account.Kind != "user" || account.Key != "alpha@synthetic.test" {
 		t.Fatalf("Worker returned invalid registrant identity: %+v", account)
 	}
 	return strings.ReplaceAll(config, `"accounts":{"default":`, fmt.Sprintf(`"accounts":{"overrides":{%q:{"upload_bytes_per_second":0,"download_bytes_per_second":0}},"default":`, account.Key))

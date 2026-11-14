@@ -6,20 +6,26 @@ package derpserver
 import (
 	"errors"
 	"fmt"
+	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // tailnetAccountIdentity is trusted callback evidence, never a client label.
-// Keep the network in the key: opaque user keys alone are not bucket identities.
+// Keep the network in the key: registering accounts alone are not bucket identities.
 type tailnetAccountIdentity struct {
 	network, kind, key string
 }
 
 func validAccountKey(key string) bool {
-	if len(key) != 67 || key[:3] != "h1_" {
+	if len(key) == 0 || len(key) > 1024 || !utf8.ValidString(key) {
 		return false
 	}
-	for _, c := range key[3:] {
-		if !(c >= '0' && c <= '9') && !(c >= 'a' && c <= 'f') {
+	if strings.TrimFunc(key, func(r rune) bool { return unicode.IsSpace(r) || r == '\uFEFF' }) != key {
+		return false
+	}
+	for _, r := range key {
+		if unicode.IsControl(r) {
 			return false
 		}
 	}
@@ -27,12 +33,12 @@ func validAccountKey(key string) bool {
 }
 
 func (id tailnetAccountIdentity) valid() bool {
-	return validRateLimitSubject(id.network) && ((id.kind == "user" && validAccountKey(id.key)) || (id.kind == "tagged" && id.key == "shared"))
+	return validRateLimitSubject(id.network) && id.kind == "user" && validAccountKey(id.key)
 }
 
 type tailnetAccountPolicies struct {
-	defaultPolicy, tagged tailnetRatePolicy
-	overrides             map[string]tailnetRatePolicy
+	defaultPolicy tailnetRatePolicy
+	overrides     map[string]tailnetRatePolicy
 }
 
 func parseTailnetPolicy(data []byte) (tailnetRatePolicy, error) {
@@ -56,7 +62,7 @@ func parseAccountPolicies(raw []byte) (*tailnetAccountPolicies, error) {
 		return nil, fmt.Errorf("accounts: %w", err)
 	}
 	for name := range fields {
-		if name != "default" && name != "tagged" && name != "overrides" {
+		if name != "default" && name != "overrides" {
 			return nil, errors.New("unknown accounts field")
 		}
 	}
@@ -65,14 +71,14 @@ func parseAccountPolicies(raw []byte) (*tailnetAccountPolicies, error) {
 	if err != nil {
 		return nil, fmt.Errorf("accounts.default: %w", err)
 	}
-	policies.tagged, err = parseTailnetLeafPolicy(fields["tagged"])
-	if err != nil {
-		return nil, fmt.Errorf("accounts.tagged: %w", err)
-	}
 	if raw, ok := fields["overrides"]; ok {
+		if !validAccountJSONUnicode(raw) {
+			return nil, errors.New("invalid accounts.overrides Unicode")
+		}
 		overrides, err := strictJSONObject(raw)
 		if err != nil {
-			return nil, fmt.Errorf("accounts.overrides: %w", err)
+			// Decoded field names are registering accounts, not safe log data.
+			return nil, errors.New("invalid accounts.overrides object")
 		}
 		for key, raw := range overrides {
 			if !validAccountKey(key) {
@@ -106,9 +112,6 @@ func (cfg tailnetRateConfig) accountPolicyFor(id tailnetAccountIdentity) (tailne
 		return tailnetRatePolicy{}, applicable
 	}
 	accounts := parent.accounts
-	if id.kind == "tagged" {
-		return accounts.tagged, true
-	}
 	if policy, ok := accounts.overrides[id.key]; ok {
 		return policy, true
 	}

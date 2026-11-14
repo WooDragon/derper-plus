@@ -12,14 +12,14 @@ import (
 
 func TestAccountPolicySelection(t *testing.T) {
 	a, b := userID("network", "a"), userID("network", "b")
-	tagged := accountID("network", "tagged", "shared")
+	tagged := userID("network", "tagged-registrant")
 	leaf := accountLeaf(10, 20)
-	parent := `{"upload_bytes_per_second":0,"download_bytes_per_second":0,"accounts":{"default":` + leaf + `,"tagged":` + accountLeaf(30, 40) + `,"overrides":{"` + a.key + `":` + accountLeaf(0, 50) + `}}}`
+	parent := `{"upload_bytes_per_second":0,"download_bytes_per_second":0,"accounts":{"default":` + leaf + `,"overrides":{"` + a.key + `":` + accountLeaf(0, 50) + `}}}`
 	cfg := parseAccountConfig(t, `{"default":`+parent+`,"tailnets":{"explicit":`+accountLeaf(0, 0)+`}}`)
 	for _, tc := range []struct {
 		id       tailnetAccountIdentity
 		up, down int
-	}{{a, 0, 50}, {b, 10, 20}, {tagged, 30, 40}, {userID("explicit", "a"), 0, 0}} {
+	}{{a, 0, 50}, {b, 10, 20}, {tagged, 10, 20}, {userID("explicit", "a"), 0, 0}} {
 		p, ok := cfg.accountPolicyFor(tc.id)
 		if !ok || p.upload != tc.up || p.download != tc.down {
 			t.Fatalf("incorrect leaf selection for %s: %v", tc.id.kind, p)
@@ -139,11 +139,11 @@ func TestAccountInvalidReloadAtomic(t *testing.T) {
 
 func TestAccountLeafValidation(t *testing.T) {
 	leaf := accountLeaf(1, 1)
-	for _, slot := range []string{"default", "tagged", "overrides"} {
+	for _, slot := range []string{"default", "overrides"} {
 		for _, value := range []string{`null`, `"1"`, `-1`, `1.0`, `1e0`, `2147483648`, `true`} {
 			t.Run(slot+"/"+value, func(t *testing.T) {
 				bad := strings.Replace(leaf, `"upload_bytes_per_second":1`, `"upload_bytes_per_second":`+value, 1)
-				accounts := `{"default":` + leaf + `,"tagged":` + leaf + `}`
+				accounts := `{"default":` + leaf + `}`
 				if slot == "overrides" {
 					accounts = strings.TrimSuffix(accounts, `}`) + `,"overrides":{"` + userID("network", "a").key + `":` + bad + `}}`
 				} else {

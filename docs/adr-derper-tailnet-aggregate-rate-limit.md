@@ -163,8 +163,8 @@ a parseable key:
 ```
 
 A denial shall use `{"Allow":false}`. `Allow:false` shall take precedence over
-identity data and shall never admit a connection. The service shall not return
-users, email addresses, tags, rates, or an official TailnetID.
+identity data and shall never admit a connection. In v1, the service shall not
+return users, email addresses, tags, rates, or an official TailnetID.
 
 `RateLimitSubject` is an operator-configured identifier, not Tailscale's
 internal tailnet ID. It shall contain 1–64 ASCII characters from
@@ -223,45 +223,47 @@ default v1 identity or authorize a rollout.
 
 ## Account aggregation increment (2026-11-14; local only)
 
-This section extends the parent-only v1 contract above. The account increment
-has passed local verification and independent code review. It is not published
-or deployed. The user-approved registering-account correction uses
-`Devices.user` for both tagged and untagged devices. Its local evidence includes
-298 Worker unit tests, 84 real-workerd tests, 30 joint scenarios with zero skips,
-and five top-level Go compatibility tests with 44 subtests. All ten joint
-listeners were reclaimed with zero cleanup errors. The independent redteam review
-of the five-file implementation/test increment returned APPROVED with no required
-fixes; it did not review this documentation update or authorize deployment.
-Earlier full Go/race and performance measurements remain historical results, not
-reruns for this correction. Its dated acceptance record is
-[Issue #12](https://github.com/WooDragon/derper-plus/issues/12); completed #10
-remains the record for the earlier parent-only delivery.
+This section extends the parent-only v1 contract above. The user approved direct
+transmission of the registering account in `Devices.user`, with the existing
+callback-token authentication unchanged and no additional account secret. The
+plain-account implementation passed independent redteam code review; its sole
+Unicode-collision finding was fixed and rechecked. That review does not cover
+this documentation update or authorize rollout. Production still uses network
+identity v1; plain-account v2 has not been deployed.
+
+Before the Unicode fix, local execution passed 267 Worker unit tests, 79 real-workerd
+tests, 30 joint scenarios, and targeted Go tests. The joint run had zero skips,
+ten reclaimed listeners, and zero cleanup errors. After the fix, only the
+91-test account suite, typecheck, and Go Account tests (27 top-level tests plus
+102 subtests) were rerun and passed. The 267/79/30 results are not final-tree
+reruns. Earlier full Go/race and performance results remain historical evidence.
+The dated evidence and release boundary are recorded in
+[Issue #12](https://github.com/WooDragon/derper-plus/issues/12).
 
 ### Parent and account policy
 
-A parent policy may contain `accounts`. When present, `accounts.default` and
-`accounts.tagged` are required; `accounts.overrides` is optional. Every leaf
-requires both directional rates and may specify `burst_bytes`, using the same
-integer and burst bounds as the parent. Nulls, empty leaves, missing directions,
-unknown fields, duplicate decoded names, and recursively nested `accounts` are
-invalid. An override replaces the complete leaf; it does not merge fields.
-Parent selection remains exact network replacement, then top-level `default`,
-then deny. An exact network without `accounts` does not inherit
-`default.accounts`.
+A parent policy may contain `accounts`. When present, `accounts.default` is
+required and `accounts.overrides` is optional; no other accounts fields are
+accepted. Every leaf requires both directional rates and may specify
+`burst_bytes`, using the same integer and burst bounds as the parent. Nulls,
+empty leaves, missing directions, unknown fields, duplicate decoded names, and
+recursively nested `accounts` are invalid. An override replaces the complete
+leaf; it does not merge fields. Parent selection remains exact network
+replacement, then top-level `default`, then deny. An exact network without
+`accounts` does not inherit `default.accounts`.
 
-User override keys shall match `h1_[a-f0-9]{64}` (67 characters). The network
-subject's 64-character limit does not apply to account keys. The new Worker
-projects tagged and untagged devices with the same valid `Devices.user` into the
-same `(network,user)` child bucket pair, using the unchanged HMAC derivation.
-`Devices.user` identifies the registering account, not the tagged device's
+An override key shall be the exact valid registering-account string from
+`Devices.user`, scoped by the selected network policy. The server shall not trim,
+lowercase, normalize Unicode, or merge aliases. Account validation is defined
+below; the network subject's 64-character limit does not apply to account keys.
+Tagged and untagged devices with the same `(network,user)` share one child bucket
+pair. `Devices.user` identifies the registering account, not the tagged device's
 current owner. Tags do not affect rate classification. Registry keys remain
 structured `(network,kind,key)` and isolated across networks.
 
-The server shall retain `(tagged,shared)` identity and `accounts.tagged` policy
-for compatibility with existing evidence. That compatibility identity selects
-a separate shared pair within the network. The new Worker shall not project
-it; its registering-account identities select user overrides or
-`accounts.default`, not `accounts.tagged`.
+The undeployed `tagged/shared` identity and `accounts.tagged` policy leaf have
+been removed. Only `Kind:user` is accepted; a valid identity selects its exact
+user override or `accounts.default`.
 
 Both layers apply in each direction:
 
@@ -294,12 +296,12 @@ A v2 request uses literal `IdentityVersion: 2` with the existing `NodePublic` an
 placeholder, not a parseable key:
 
 ```json
-{"Allow":true,"IdentityVersion":2,"Identity":{"NodePublic":"nodekey:<matching-public-key>","RateLimitSubject":"network-a","Account":{"Kind":"user","Key":"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987"}}}
+{"Allow":true,"IdentityVersion":2,"Identity":{"NodePublic":"nodekey:<matching-public-key>","RateLimitSubject":"network-a","Account":{"Kind":"user","Key":"Synthetic.User@example.test"}}}
 ```
 
-The account key in this example is a synthetic fixture. The retained compatibility
-identity is `{"Kind":"tagged","Key":"shared"}`. The server shall still accept it,
-but the new Worker shall emit `Kind:user` for both tagged and untagged devices.
+The account in this example is synthetic. `Key` is the valid `Devices.user`
+string itself. The Worker shall emit `Kind:user` for both tagged and untagged
+devices.
 Denial remains `{"Allow":false}`.
 The v2 parser checks complete whitelists, types, presence, duplicate decoded
 fields, the 4096-byte body limit, and the canonical node-key echo at response,
@@ -307,62 +309,50 @@ Identity, and Account boundaries. `2.0`, `2e0`, strings, v1 responses, and
 Allow-only responses cannot downgrade v2. The legacy/v1 decoders retain their
 existing behavior; v2 strictness is not retroactive.
 
-### Evidence, pseudonyms, and key maintenance
+### Plain-account evidence and adoption
 
-The new Worker uses valid `Devices.user` from `devices:core:read` as the
-registering account for both tagged and untagged devices. It does not call the
-Users API or infer current owner/admin status. Tags do not affect account
-projection, including when tag fields are missing or malformed. Both device
-classes require a nonempty user string with no leading/trailing whitespace or
-control characters and at most 1024 UTF-8 bytes. Missing or invalid user evidence
-shall yield unknown and reject v2, without falling back to shared. No trimming,
-lowercasing, Unicode normalization, or alias merging occurs. Valid legacy/v1
-membership remains unchanged.
+The Worker uses valid `Devices.user` from `devices:core:read` as the registering
+account for both tagged and untagged devices. It does not call the Users API or
+infer current owner/admin status. Tags do not affect projection, including
+missing or malformed tag fields. A valid account is a nonempty string with no
+leading/trailing whitespace (including U+FEFF), no U+0000–U+001F or U+007F–U+009F control characters,
+no isolated surrogate, and at most 1024 UTF-8 bytes. Valid Unicode, including
+paired surrogates, shall remain unchanged. Missing or invalid user evidence
+shall yield unknown and reject v2. Valid legacy/v1 membership remains unchanged.
+The wire and policy parsers shall reject isolated JSON surrogate escapes rather
+than decode them into U+FFFD and merge distinct account strings. A literal or
+correctly escaped U+FFFD remains valid and distinct from malformed input.
 
-The service's `ACCOUNT_IDENTITY_KEY` is 64 lowercase hex characters decoded into
-32 HMAC key bytes. A user key is `h1_` plus lowercase HMAC-SHA-256 hex over UTF-8
-`JSON.stringify(["derp-account-v1",networkSubject,user])`. JSON array encoding,
-including escaping, is required; delimiter concatenation is not equivalent.
-The synthetic vectors in
-[testdata/account-vectors.json](../derp/derpserver/testdata/account-vectors.json)
-cover cross-network isolation, case, escaping, and Unicode distinctions. Raw
-user/email strings shall not enter snapshots, wire responses, or request logs.
-HMAC provides keyed pseudonymization, not encryption or stable account IDs.
+The raw account string enters snapshots and v2 wire responses, but shall not
+enter ordinary request logs. The HTTPS callback and existing callback-token
+authentication remain unchanged. No account secret, HMAC/context derivation,
+offline derivation tool, dedicated derivation vectors, or account-secret backup
+and rotation obligation remains in this contract.
 
-The service retains `source:v2:` and base snapshot schema version 2. Optional
-`accountEvidence:{version:1,context:<64 lowercase hex>}` and per-node account
-objects extend it. Context is the HMAC of UTF-8
-`JSON.stringify(["derp-account-context-v1",networkSubject])` under the same key.
-Same-network sources with different OAuth credentials yield the same context
-and account key. v2 requires current metadata for every participating source,
-valid base snapshots, and consistent identities across every matching unexpired
-record, including duplicate node keys. Unknown/conflicting matches reject.
-Unknown evidence on an unrelated node does not itself reject a known target.
+The service retains `source:v2:`, sourceKey/fingerprint, and base snapshot schema
+version 2. A successful refresh adds exactly `accountEvidence:{version:2}` and
+per-node raw account objects or unknown evidence. v2 requires valid base
+snapshots and this metadata for every participating source. Old evidence version
+1, version 2 with a context field, and missing account metadata shall reject v2;
+old evidence shall not be upgraded. All matching unexpired records, including
+duplicate node keys, shall agree on `(network,kind,key)`. Unknown or conflicting
+matches reject. Unknown evidence on an unrelated node does not itself reject a
+known target.
 
-A successful refresh replaces old account evidence even when the new evidence
-is unknown; API failure retains the complete LKG. Existing shared snapshots and
-valid contexts remain legal compatibility evidence; the projection correction
-does not invalidate them automatically. Before a consumer cutover, all configured
-sources shall complete a real successful refresh under the new Worker. Operators
-shall then read back v2 `Kind:user` and verify the same key for tagged and
-untagged devices with the same registering account. A valid context, an old
-shared LKG, or a health response alone does not establish readiness.
+A complete successful refresh replaces old evidence, including with new unknown
+evidence. API failure retains the complete last-known-good snapshot (LKG).
+Before a consumer cutover, every configured source shall complete a real
+successful refresh under the new Worker. Operators shall then read back v2
+`Kind:user` with the expected raw account string and verify matching keys for
+tagged and untagged devices with the same registering account. Health checks,
+a triggered Cron, an old LKG, or one successful source do not establish readiness.
 
 Old snapshots or invalid account additions do not invalidate otherwise valid
-v1 membership. Missing or invalid secret leaves legacy/v1 operational but rejects
-v2. An old Worker may serve v1 from extended snapshots; if its refresh removes
-account metadata, v2 rejects instead of falling back. No identity is synthesized
-from old snapshots.
-
-No production account key was generated or uploaded for this increment.
-Production adoption requires separately approved secure provisioning and a
-recoverable protected backup outside the sole control machine. Operators shall
-keep secret bytes out of command arguments, source control, and logs. Restoring
-snapshots without the corresponding key does not restore v2 readiness. Rotation
-changes keys, overrides, and bucket identities while established connections
-retain their old identity. Rotation therefore requires disabling account
-capability and coordinating migration; it is not transparent hot rotation.
-This ADR specifies the obligation, not an authorized rollout procedure.
+legacy/v1 membership. An old Worker may serve v1 from extended snapshots; if its
+refresh removes account metadata, v2 rejects rather than falling back. Indefinite
+LKG revocation delay and connection-bound identity remain unchanged. Publication,
+deployment, full-source prewarming/readback, consumer cutover, and rollback
+preparation remain separately authorized work, not actions authorized by this ADR.
 
 ### Atomic accounting and retained history
 
@@ -420,9 +410,9 @@ post-implementation review is complete. Dated counts and build limitations are
 recorded in existing [Issue #10](https://github.com/WooDragon/derper-plus/issues/10).
 These results do not establish production adoption or authorize rollout.
 
-The local source content was synchronized to verified upstream stable v1.104.6
-(`c54807352ae196919497b3f8fddc3cedf88368b9`, released 2026-11-11), with Go 1.27.3
-and a matching builder. This is content synchronization, not a history merge,
-a commit to `stable`, or a published release. The original HEAD, index, and refs
-were preserved. The three added upstream workflows restrict every job to the
-official repository. No automatic tracking task was established.
+The earlier local verification used source content from verified upstream stable
+v1.104.6 (`c54807352ae196919497b3f8fddc3cedf88368b9`, released 2026-11-11), with
+Go 1.27.3 and a matching builder. This records that execution's baseline, not the
+status of subsequent branch integration or publication. The three added upstream
+workflows restrict every job to the official repository. No automatic tracking
+task was established.
