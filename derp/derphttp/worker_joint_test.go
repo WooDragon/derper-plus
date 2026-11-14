@@ -30,6 +30,7 @@ type jointReady struct {
 	AccountNormal, AccountUnknown, AccountConflict, OldWorker string
 	AccountBinaryURL, AccountPolicy, AccountLog               string
 	AccountPID                                                int
+	Coordinators                                              []jointCoordinatorBinary
 }
 type jointKey struct {
 	Public  string `json:"public"`
@@ -91,6 +92,7 @@ func TestWorkerJoint(t *testing.T) {
 	})
 	t.Run("binary_sighup_existing_connections", h.sighup)
 	h.accountScenarios(t)
+	h.coordinatorScenarios(t)
 }
 
 func (h *jointHarness) addKey(name, subject string) {

@@ -55,6 +55,10 @@ func (r *tailnetRateRegistry) allowAccount(id tailnetAccountIdentity, size int, 
 	}
 	now := r.now()
 	pb, cb := directionalBucket(parent, upload), directionalBucket(child, upload)
+	if r.coordinator != nil {
+		r.countCoordinator(CoordinatorSubject{Kind: "network", Network: id.network}, parent, size, upload, false)
+		r.countCoordinator(CoordinatorSubject{Kind: "account", Network: id.network, Account: id.key}, child, size, upload, false)
+	}
 	parentOK, childOK := pb.canSpend(size, now), cb.canSpend(size, now)
 	if !parentOK || !childOK {
 		return false
@@ -64,6 +68,10 @@ func (r *tailnetRateRegistry) allowAccount(id tailnetAccountIdentity, size int, 
 	}
 	if cb.mode == tailnetLimited {
 		cb.tokens -= float64(size)
+	}
+	if r.coordinator != nil {
+		r.countCoordinator(CoordinatorSubject{Kind: "network", Network: id.network}, parent, size, upload, true)
+		r.countCoordinator(CoordinatorSubject{Kind: "account", Network: id.network, Account: id.key}, child, size, upload, true)
 	}
 	return true
 }

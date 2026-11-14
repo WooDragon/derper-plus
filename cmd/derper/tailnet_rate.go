@@ -39,6 +39,14 @@ func validateTailnetAccountMode(tailnet string, enabled bool) error {
 	if enabled && tailnet == "" {
 		return errors.New("--tailnet-account-identity requires --tailnet-rate-config")
 	}
+	return validateTailnetCoordinatorMode(*tailnetCoordinatorConfigPath, tailnet, enabled)
+}
+
+func startTailnetRateWatchers(ctx context.Context, s *derpserver.Server, path string) error {
+	if err := startTailnetCoordinator(ctx, s); err != nil {
+		return err
+	}
+	go watchTailnetRateConfig(ctx, s, path)
 	return nil
 }
 
