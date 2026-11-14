@@ -20,6 +20,7 @@ const maxTailnetRateConfigSize = 1 << 20
 
 type tailnetRatePolicy struct {
 	upload, download, burst int
+	accounts                *tailnetAccountPolicies
 }
 
 type tailnetRateConfig struct {
@@ -113,12 +114,17 @@ func parseTailnetRateConfig(data []byte) (tailnetRateConfig, error) {
 	return cfg, nil
 }
 
-func parseTailnetPolicy(data []byte) (tailnetRatePolicy, error) {
-	policy := tailnetRatePolicy{burst: derp.MaxPacketSize}
+func parseTailnetLeafPolicy(data []byte) (tailnetRatePolicy, error) {
 	fields, err := strictJSONObject(data)
 	if err != nil {
-		return policy, err
+		return tailnetRatePolicy{}, err
 	}
+	return parseTailnetLeafFields(fields)
+}
+
+func parseTailnetLeafFields(fields map[string]json.RawMessage) (tailnetRatePolicy, error) {
+	policy := tailnetRatePolicy{burst: derp.MaxPacketSize}
+	var err error
 	for name := range fields {
 		if name != "upload_bytes_per_second" && name != "download_bytes_per_second" && name != "burst_bytes" {
 			return policy, fmt.Errorf("unknown policy field %q", name)
@@ -179,7 +185,19 @@ func (s *Server) LoadAndApplyTailnetRateConfig(path string) error {
 	if err != nil {
 		return err
 	}
+	hasAccounts := cfg.hasAccounts()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.tailnetAccountIdentity && hasAccounts {
+		return errors.New("accounts require startup tailnet account identity capability")
+	}
 	if s.tailnetRate == nil {
+		if s.accepts.Value() != 0 {
+			return errors.New("tailnet mode must be initialized before Accept")
+		}
+		if s.tailnetAccountIdentity && (s.verifyClientsURL == "" || s.verifyClientsLocalTailscaled || s.verifyClientsURLFailOpen || s.userRate != nil) {
+			return errors.New("tailnet account identity requires fail-closed external tailnet admission")
+		}
 		s.tailnetRate = newTailnetRateRegistry(cfg, s.clock.Now)
 	} else {
 		s.tailnetRate.apply(cfg)

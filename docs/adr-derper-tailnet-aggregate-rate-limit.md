@@ -56,8 +56,10 @@ An incompatible combination shall fail startup. The existing fail-open default
 is `true`; implementation shall not silently change that legacy default.
 Without the new flag, legacy behavior shall remain unchanged.
 
-Local WhoIs shall not supply identity in the new mode. The new mode shall not
-distinguish users from tagged nodes. Existing owner or trusted-user exceptions
+Local WhoIs shall not supply identity in this mode. Default v1 supplies only
+network identity; the optional v2 increment below adds registering-account
+identity without classifying limits by tags.
+Existing owner or trusted-user exceptions
 shall not migrate automatically, including any old owner unlimited policy.
 Mode selection occurs at startup; a policy reload shall not switch modes.
 
@@ -215,8 +217,184 @@ Source mapping, cache validity, last-known-good snapshot adoption, and their
 availability and revocation tradeoffs belong to the admission service's design.
 This ADR does not define a second cache protocol or a global identity index.
 The local implementation is complete; rollout remains separate work. Cross-process buckets,
-CloudFront changes, site cutovers, and fine-grained user identity are out of
-scope.
+CloudFront changes and site cutovers remain out of scope. The account increment
+below extends identity only through explicit v2 capability; it does not change
+default v1 identity or authorize a rollout.
+
+## Account aggregation increment (2026-11-14; local only)
+
+This section extends the parent-only v1 contract above. The account increment
+has passed local verification and independent code review. It is not committed,
+published, or deployed. The user-approved registering-account correction uses
+`Devices.user` for both tagged and untagged devices. Its local evidence includes
+298 Worker unit tests, 84 real-workerd tests, 30 joint scenarios with zero skips,
+and five top-level Go compatibility tests with 44 subtests. All ten joint
+listeners were reclaimed with zero cleanup errors. The independent redteam review
+of the five-file implementation/test increment returned APPROVED with no required
+fixes; it did not review this documentation update or authorize deployment.
+Earlier full Go/race and performance measurements remain historical results, not
+reruns for this correction. Its dated acceptance record is
+[Issue #12](https://github.com/WooDragon/derper-plus/issues/12); completed #10
+remains the record for the earlier parent-only delivery.
+
+### Parent and account policy
+
+A parent policy may contain `accounts`. When present, `accounts.default` and
+`accounts.tagged` are required; `accounts.overrides` is optional. Every leaf
+requires both directional rates and may specify `burst_bytes`, using the same
+integer and burst bounds as the parent. Nulls, empty leaves, missing directions,
+unknown fields, duplicate decoded names, and recursively nested `accounts` are
+invalid. An override replaces the complete leaf; it does not merge fields.
+Parent selection remains exact network replacement, then top-level `default`,
+then deny. An exact network without `accounts` does not inherit
+`default.accounts`.
+
+User override keys shall match `h1_[a-f0-9]{64}` (67 characters). The network
+subject's 64-character limit does not apply to account keys. The new Worker
+projects tagged and untagged devices with the same valid `Devices.user` into the
+same `(network,user)` child bucket pair, using the unchanged HMAC derivation.
+`Devices.user` identifies the registering account, not the tagged device's
+current owner. Tags do not affect rate classification. Registry keys remain
+structured `(network,kind,key)` and isolated across networks.
+
+The server shall retain `(tagged,shared)` identity and `accounts.tagged` policy
+for compatibility with existing evidence. That compatibility identity selects
+a separate shared pair within the network. The new Worker shall not project
+it; its registering-account identities select user overrides or
+`accounts.default`, not `accounts.tagged`.
+
+Both layers apply in each direction:
+
+| Parent | Account | Effective constraint |
+|---|---|---|
+| Limited | Zero | Parent only |
+| Zero | Limited | Account only |
+| Zero | Zero | Unlimited |
+| Limited | Limited | Both must allow |
+| Deny | Any | Deny; an account cannot restore access |
+
+Absent `accounts` retains parent-only policing. Zero removes only that layer's
+directional limit; it is not an exemption from the parent. This remains payload
+policing without fair scheduling or a minimum bandwidth guarantee.
+
+### Fixed process capability and v2 wire
+
+`--tailnet-account-identity` defaults to false. False sends v1 and rejects any
+configuration containing `accounts`, including unmatched entries, on both
+initial load and reload. True is valid only with `--tailnet-rate-config` and
+requires full v2 identity for every non-mesh connection, even when its selected
+parent has no account policy. Capability validation also applies to server
+configuration APIs. Initialization fixes the capability; it cannot change once
+the registry is initialized or Accept has started. A process change, not SIGHUP,
+is required to change this capability. Existing rate-mode exclusivity, local
+WhoIs exclusion, and trusted-mesh exemption remain unchanged.
+
+A v2 request uses literal `IdentityVersion: 2` with the existing `NodePublic` and
+`Source`. An allowing response has the following shape; the node key is a
+placeholder, not a parseable key:
+
+```json
+{"Allow":true,"IdentityVersion":2,"Identity":{"NodePublic":"nodekey:<matching-public-key>","RateLimitSubject":"network-a","Account":{"Kind":"user","Key":"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987"}}}
+```
+
+The account key in this example is a synthetic fixture. The retained compatibility
+identity is `{"Kind":"tagged","Key":"shared"}`. The server shall still accept it,
+but the new Worker shall emit `Kind:user` for both tagged and untagged devices.
+Denial remains `{"Allow":false}`.
+The v2 parser checks complete whitelists, types, presence, duplicate decoded
+fields, the 4096-byte body limit, and the canonical node-key echo at response,
+Identity, and Account boundaries. `2.0`, `2e0`, strings, v1 responses, and
+Allow-only responses cannot downgrade v2. The legacy/v1 decoders retain their
+existing behavior; v2 strictness is not retroactive.
+
+### Evidence, pseudonyms, and key maintenance
+
+The new Worker uses valid `Devices.user` from `devices:core:read` as the
+registering account for both tagged and untagged devices. It does not call the
+Users API or infer current owner/admin status. Tags do not affect account
+projection, including when tag fields are missing or malformed. Both device
+classes require a nonempty user string with no leading/trailing whitespace or
+control characters and at most 1024 UTF-8 bytes. Missing or invalid user evidence
+shall yield unknown and reject v2, without falling back to shared. No trimming,
+lowercasing, Unicode normalization, or alias merging occurs. Valid legacy/v1
+membership remains unchanged.
+
+The service's `ACCOUNT_IDENTITY_KEY` is 64 lowercase hex characters decoded into
+32 HMAC key bytes. A user key is `h1_` plus lowercase HMAC-SHA-256 hex over UTF-8
+`JSON.stringify(["derp-account-v1",networkSubject,user])`. JSON array encoding,
+including escaping, is required; delimiter concatenation is not equivalent.
+The synthetic vectors in
+[testdata/account-vectors.json](../derp/derpserver/testdata/account-vectors.json)
+cover cross-network isolation, case, escaping, and Unicode distinctions. Raw
+user/email strings shall not enter snapshots, wire responses, or request logs.
+HMAC provides keyed pseudonymization, not encryption or stable account IDs.
+
+The service retains `source:v2:` and base snapshot schema version 2. Optional
+`accountEvidence:{version:1,context:<64 lowercase hex>}` and per-node account
+objects extend it. Context is the HMAC of UTF-8
+`JSON.stringify(["derp-account-context-v1",networkSubject])` under the same key.
+Same-network sources with different OAuth credentials yield the same context
+and account key. v2 requires current metadata for every participating source,
+valid base snapshots, and consistent identities across every matching unexpired
+record, including duplicate node keys. Unknown/conflicting matches reject.
+Unknown evidence on an unrelated node does not itself reject a known target.
+
+A successful refresh replaces old account evidence even when the new evidence
+is unknown; API failure retains the complete LKG. Existing shared snapshots and
+valid contexts remain legal compatibility evidence; the projection correction
+does not invalidate them automatically. Before a consumer cutover, all configured
+sources shall complete a real successful refresh under the new Worker. Operators
+shall then read back v2 `Kind:user` and verify the same key for tagged and
+untagged devices with the same registering account. A valid context, an old
+shared LKG, or a health response alone does not establish readiness.
+
+Old snapshots or invalid account additions do not invalidate otherwise valid
+v1 membership. Missing or invalid secret leaves legacy/v1 operational but rejects
+v2. An old Worker may serve v1 from extended snapshots; if its refresh removes
+account metadata, v2 rejects instead of falling back. No identity is synthesized
+from old snapshots.
+
+No production account key was generated or uploaded for this increment.
+Production adoption requires separately approved secure provisioning and a
+recoverable protected backup outside the sole control machine. Operators shall
+keep secret bytes out of command arguments, source control, and logs. Restoring
+snapshots without the corresponding key does not restore v2 readiness. Rotation
+changes keys, overrides, and bucket identities while established connections
+retain their old identity. Rotation therefore requires disabling account
+capability and coordinating migration; it is not transparent hot rotation.
+This ADR specifies the obligation, not an authorized rollout procedure.
+
+### Atomic accounting and retained history
+
+Trusted admission registers parent and account buckets before packet handling.
+v2 registers unlimited account history even while `accounts` is absent; trusted
+identities denied by the parent retain deny history. The packet path performs
+bucket lookups but never creates buckets. Admission and registration retain full
+identity validation; the packet path does not repeat string validation per
+payload.
+
+Within one registry mutex and one timestamp, each directional check settles both
+layers, checks all active limits, then debits both finite balances only if all
+allow. A denial may settle time but debits neither layer. Upload charges the
+sender and download charges the receiver; this is not a transaction across the
+entire forwarding path. Mesh ingress avoids duplicate upload; local delivery
+still consumes parent and account download allowances.
+
+Parsing and fixed-capability validation occur outside the registry lock. A valid
+reload updates all parent/account buckets and publishes the policy under one
+lock and timestamp; invalid input changes nothing. The existing lifecycle table
+applies to both layers. Closing `accounts` freezes child finite history through
+unlimited; reopening it resumes without refill. Parent removal selects deny
+unless a default applies. Reconnects never create a fresh burst. A new limited
+identity receives one initial burst; an identity previously registered only as
+unlimited/deny starts its first limited balance at zero.
+
+Historical buckets are not garbage-collected. Reload work remains
+O(parent buckets + account buckets), and the server lock remains held during
+application. The measured reload cost is accepted as nonblocking, not fixed;
+measurements belong to the dated issue, not a production pause guarantee. Other
+limits remain mutable/reused user strings, indefinite LKG revocation delay,
+connection-bound identity, and per-process rather than distributed quotas.
 
 ## Acceptance coverage and delivery status
 

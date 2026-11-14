@@ -35,6 +35,13 @@ func validateTailnetRateMode(tailnet, user, legacy, url string, local, failOpen 
 	return nil
 }
 
+func validateTailnetAccountMode(tailnet string, enabled bool) error {
+	if enabled && tailnet == "" {
+		return errors.New("--tailnet-account-identity requires --tailnet-rate-config")
+	}
+	return nil
+}
+
 func watchTailnetRateConfig(ctx context.Context, s *derpserver.Server, path string) {
 	sighup := make(chan os.Signal, 1)
 	signal.Notify(sighup, syscall.SIGHUP)

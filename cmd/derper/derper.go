@@ -94,6 +94,8 @@ var (
 	userRateConfigPath    = flag.String("user-rate-config", "", "if non-empty, path to strict JSON per-user packet policing config. Requires --verify-clients=true, exempts mesh peers from policing, and reloads on SIGHUP.")
 	tailnetRateConfigPath = flag.String("tailnet-rate-config", "", "path to strict per-tailnet aggregate payload policing config; requires --verify-client-url, --verify-clients=false and --verify-client-url-fail-open=false; reloads on SIGHUP")
 
+	tailnetAccountIdentity = flag.Bool("tailnet-account-identity", false, "require version 2 account identities for every non-mesh tailnet connection; startup-only capability")
+
 	// tcpKeepAlive is intentionally long, to reduce battery cost. There is an L7 keepalive on a higher frequency schedule.
 	tcpKeepAlive = flag.Duration("tcp-keepalive-time", 10*time.Minute, "TCP keepalive time")
 	// tcpUserTimeout is intentionally short, so that hung connections are cleaned up promptly. DERPs should be nearby users.
@@ -174,6 +176,10 @@ func main() {
 		log.Fatalf("derper: %v", err)
 	}
 
+	if err := validateTailnetAccountMode(*tailnetRateConfigPath, *tailnetAccountIdentity); err != nil {
+		log.Fatalf("derper: %v", err)
+	}
+
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
@@ -207,6 +213,9 @@ func main() {
 	}
 	s.SetTCPWriteTimeout(*tcpWriteTimeout)
 	if *tailnetRateConfigPath != "" {
+		if err := s.SetTailnetAccountIdentity(*tailnetAccountIdentity); err != nil {
+			log.Fatalf("derper: selecting tailnet account identity: %v", err)
+		}
 		if err := s.LoadAndApplyTailnetRateConfig(*tailnetRateConfigPath); err != nil {
 			log.Fatalf("derper: loading tailnet rate config: %v", err)
 		}

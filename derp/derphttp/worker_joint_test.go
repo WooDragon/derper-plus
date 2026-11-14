@@ -22,9 +22,12 @@ import (
 )
 
 type jointReady struct {
-	Normal, Unknown, Conflict, Legacy, Binary string
-	BinaryURL, Policy                         string
-	PID                                       int
+	Normal, Unknown, Conflict, Legacy, Binary                 string
+	BinaryURL, Policy                                         string
+	PID                                                       int
+	AccountNormal, AccountUnknown, AccountConflict, OldWorker string
+	AccountBinaryURL, AccountPolicy, AccountLog               string
+	AccountPID                                                int
 }
 type jointKey struct {
 	Public  string `json:"public"`
@@ -49,6 +52,10 @@ func TestWorkerJoint(t *testing.T) {
 	}
 	h.addKey("other", "network0")
 	h.addKey("free", "free")
+	for _, name := range []string{"same0", "same1", "different", "tagged0", "tagged1", "unknownaccount"} {
+		h.addKey(name, "network0")
+	}
+	h.addKey("cross", "network1")
 	data, err := json.Marshal(h.public)
 	if err != nil {
 		t.Fatal(err)
@@ -81,6 +88,7 @@ func TestWorkerJoint(t *testing.T) {
 		}
 	})
 	t.Run("binary_sighup_existing_connections", h.sighup)
+	h.accountScenarios(t)
 }
 
 func (h *jointHarness) addKey(name, subject string) {

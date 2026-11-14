@@ -1,0 +1,190 @@
+{
+  "nodePublic": "nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "subject": "network-0",
+  "request": {
+    "NodePublic": "nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "Source": "fixture",
+    "IdentityVersion": 2
+  },
+  "allow": {
+    "Allow": true,
+    "IdentityVersion": 2,
+    "Identity": {
+      "NodePublic": "nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "RateLimitSubject": "network-0",
+      "Account": {
+        "Kind": "user",
+        "Key": "h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987"
+      }
+    }
+  },
+  "taggedAllow": {
+    "Allow": true,
+    "IdentityVersion": 2,
+    "Identity": {
+      "NodePublic": "nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "RateLimitSubject": "network-0",
+      "Account": {
+        "Kind": "tagged",
+        "Key": "shared"
+      }
+    }
+  },
+  "deny": {
+    "Allow": false
+  },
+  "responses": [
+    {
+      "name": "user",
+      "valid": true,
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"}}}"
+    },
+    {
+      "name": "tagged",
+      "valid": true,
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"tagged\",\"Key\":\"shared\"}}}"
+    },
+    {
+      "name": "allow-only",
+      "valid": false,
+      "raw": "{\"Allow\":true}"
+    },
+    {
+      "name": "downgraded-v1",
+      "valid": false,
+      "raw": "{\"Allow\":true,\"IdentityVersion\":1,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"}}}"
+    },
+    {
+      "name": "version-2.0",
+      "valid": false,
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2.0,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"}}}"
+    },
+    {
+      "name": "version-2e0",
+      "valid": false,
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2e0,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"}}}"
+    },
+    {
+      "name": "version-\"2\"",
+      "valid": false,
+      "raw": "{\"Allow\":true,\"IdentityVersion\":\"2\",\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"}}}"
+    },
+    {
+      "name": "version-null",
+      "valid": false,
+      "raw": "{\"Allow\":true,\"IdentityVersion\":null,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"}}}"
+    },
+    {
+      "name": "duplicate-version",
+      "valid": false,
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"}},\"Identity\\u0056ersion\":2}"
+    },
+    {
+      "name": "duplicate-account",
+      "valid": false,
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"K\\u0069nd\":\"tagged\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"}}}"
+    },
+    {
+      "name": "duplicate-identity",
+      "valid": false,
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"}},\"Identity\":{}}"
+    },
+    {
+      "name": "extra-top",
+      "valid": false,
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"}},\"Unexpected\":true}"
+    },
+    {
+      "name": "extra-identity",
+      "valid": false,
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"},\"Unexpected\":true}}"
+    },
+    {
+      "name": "extra-account",
+      "valid": false,
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\",\"Unexpected\":true}}}"
+    },
+    {
+      "name": "unknown",
+      "valid": false,
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"unknown\"}}}"
+    },
+    {
+      "name": "short-key",
+      "valid": false,
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_bad\"}}}"
+    },
+    {
+      "name": "wrong-tagged",
+      "valid": false,
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"tagged\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"}}}"
+    },
+    {
+      "name": "uppercase-key",
+      "valid": false,
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"H1_596E6E2F00EF312162A11E49AEE4FEFD8F46B9AD117DC26307BBE80C6401F987\"}}}"
+    },
+    {
+      "name": "missing-key",
+      "valid": false,
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\"}}}"
+    },
+    {
+      "name": "null-account",
+      "valid": false,
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":null}}"
+    },
+    {
+      "name": "wrong-echo",
+      "valid": false,
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"}}}"
+    },
+    {
+      "name": "noncanonical-echo",
+      "valid": false,
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"NODEKEY:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"}}}"
+    },
+    {
+      "name": "oversize",
+      "valid": false,
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"}}}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 "
+    },
+    {
+      "name": "trailing",
+      "valid": false,
+      "raw": "{\"Allow\":true,\"IdentityVersion\":2,\"Identity\":{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"RateLimitSubject\":\"network-0\",\"Account\":{\"Kind\":\"user\",\"Key\":\"h1_596e6e2f00ef312162a11e49aee4fefd8f46b9ad117dc26307bbe80c6401f987\"}}}{}"
+    }
+  ],
+  "requests": [
+    {
+      "name": "literal-v2",
+      "valid": true,
+      "raw": "{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"Source\":\"fixture\",\"IdentityVersion\":2}"
+    },
+    {
+      "name": "nonliteral-2.0",
+      "valid": false,
+      "raw": "{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"IdentityVersion\":2.0}"
+    },
+    {
+      "name": "nonliteral-2e0",
+      "valid": false,
+      "raw": "{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"IdentityVersion\":2e0}"
+    },
+    {
+      "name": "nonliteral-\"2\"",
+      "valid": false,
+      "raw": "{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"IdentityVersion\":\"2\"}"
+    },
+    {
+      "name": "nonliteral-2.0000000000000001",
+      "valid": false,
+      "raw": "{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"IdentityVersion\":2.0000000000000001}"
+    },
+    {
+      "name": "duplicate-version",
+      "valid": false,
+      "raw": "{\"NodePublic\":\"nodekey:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"IdentityVersion\":2,\"Identity\\u0056ersion\":2}"
+    }
+  ]
+}
