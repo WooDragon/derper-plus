@@ -28,7 +28,9 @@ means derper to client. A same-tailnet transfer consumes each direction once.
 The policer counts DERP packet payload bytes and immediately drops excess
 payloads. It does not queue traffic or guarantee fairness among nodes.
 
-The limits are per process, not a network-wide total. Wire overhead, direct P2P,
+By default, the static limits are per process, not a network-wide total. The
+optional coordinator below adds a cross-node soft limit, not a strict global
+bucket. Wire overhead, direct P2P,
 Peer Relay, and STUN are outside these limits. Trusted mesh peers remain exempt.
 Mesh forwarding avoids a second upload charge at the receiving relay; delivery
 to its local client still consumes that client's subject download allowance.
@@ -117,7 +119,7 @@ paths can cold-deny. Infinite last-known-good retention still enforces device
 expiry and can delay revocation indefinitely. A health response alone does not
 prove admission readiness. No existing connection is revoked by a refresh.
 
-## Optional account layer (local increment, not deployed)
+## Optional account layer (v2 adopted in Chengdu on 2026-11-14)
 
 Before configuring this increment, read the
 [account contract in the ADR](adr-derper-tailnet-aggregate-rate-limit.md#account-aggregation-increment-2026-11-14-local-only).
@@ -232,6 +234,151 @@ Dated evidence and the accepted reload-cost limitation are retained in
 writer-flood test-oracle defect is independently tracked in
 [Issue #13](https://github.com/WooDragon/derper-plus/issues/13); it is not fixed by
 this increment.
+
+## Optional cross-node coordinator
+
+As of 2026-11-15, the two-repository implementation, required local verification,
+and independent code review are complete. Publication and production-adoption
+status are tracked in this repository's Issue #17 and host operations records.
+The existing Chengdu account-v2 adoption above does not imply coordinator adoption
+or approve another rollout.
+
+> **Required reading:** Before configuring or changing the coordinator, read
+> `services/derp-admission-worker/README.md`, section “可选跨节点动态全局软限速”, in
+> [the personal-infra repository](https://github.com/WooDragon/personal-infra).
+> That README is the sole authority for coordinator wire fields, HTTP behavior,
+> global configuration, allocation, fencing, persistence, and errors. After
+> publication, use the corresponding release revision. Do not assume that the
+> repositories are siblings on a deployed host.
+
+### Startup configuration
+
+The coordinator defaults to disabled. To opt in, the process requires both
+`--tailnet-rate-config=<local-policy-path>` and
+`--tailnet-account-identity=true`, in addition to the existing external-admission
+startup requirements above. Add `--tailnet-coordinator-config=<config-path>`.
+An incompatible combination or invalid startup file fails startup.
+
+The coordinator file is a complete strict JSON object of at most 1 MiB. Exactly
+three nonempty string fields are required. Unknown or duplicate fields, trailing
+JSON, and invalid Unicode are rejected. This example uses synthetic values and
+file paths; it is not a production deployment command:
+
+```json
+{
+  "endpoint": "https://coordinator.example.test/coordinator/report",
+  "nodeId": "relay-a",
+  "tokenFile": "/etc/derper/admission-token"
+}
+```
+
+- `endpoint` must use HTTPS and the exact `/coordinator/report` path. The client
+  rejects userinfo, query, fragment, opaque URLs, and encoded paths. It does not
+  follow redirects. Only tests can explicitly permit IP-loopback HTTP; no
+  production flag enables that exception.
+- `nodeId` uses 1–64 ASCII characters from `[A-Za-z0-9_-]` and must appear in the
+  Worker's global node whitelist. Each nodeId shall have only one running
+  instance. Hosts shall keep synchronized clocks: a clock rollback or identical
+  boot timestamp can trigger fencing rejection. There is no startup lease or
+  local persistent fencing file.
+- `tokenFile` contains the existing Worker's `ADMISSION_TOKEN` value, not a new
+  secret or a credential extracted from the verify URL. The client reads at most
+  4096 bytes and permits one conventional trailing LF/CRLF. The remaining token
+  must be nonempty printable ASCII without whitespace. The new endpoint uses
+  Bearer authentication; the existing verify query-token contract is unchanged.
+
+The process reads this config and token at startup only. SIGHUP does not reread
+or rotate them. A process restart is required to change endpoint, nodeId, or
+token. The global configuration belongs to the Worker; copying local policy
+into that configuration is not an automatic synchronization mechanism.
+
+### Reporting and response validation
+
+The production reporter exchanges complete activity windows every 30 seconds,
+starting after the first ticker interval. It allows one in-flight request with
+a 5-second total timeout. Shutdown cancels the request. It does not retry old
+reports or maintain a pending queue; the next tick samples a new window.
+Intervals are not production tuning flags.
+
+The trusted packet path counts attempted bytes before rate rejection and admitted
+bytes only when both parent and account allow. Admitted does not mean successful
+socket delivery. Parent counters do not double-count parent/child rejection.
+Only the current activity set enters the report, not every historical bucket.
+An invalid duration, overflow, or capacity excess discards the complete window
+rather than submitting truncated demand. Missing entries represent no demand in
+that window; later attempts, including deny rejections, restore activity.
+
+The client requires HTTP 200, bounds the response to 1 MiB, and validates the
+complete strict document before applying any allocation. It checks version,
+nodeId, bootId, acceptedSeq, generation, numeric ranges, modes, duplicate subjects,
+capacity, and registration of every allocated identity. Generation cannot go
+backward. policyRevision is validated and logged; the client does not maintain a
+second revision high-water mark. The README defines the full wire contract,
+including the coordinator's independent `version:1`, which is not admission v2.
+
+### Effective limits, lifecycle, and failure behavior
+
+The in-memory overlay intersects the local static policy independently for each
+network/account direction: deny wins, unlimited acts as infinity, and finite
+rates use the minimum. A global unlimited allocation cannot remove a finite
+local limit. A local unlimited account cannot bypass a finite parent. Dynamic
+zero share is deny; static JSON rate 0 remains unlimited.
+
+Static SIGHUP reloads and coordinator responses compose under the same registry
+lock. Reloads retain the overlay; responses retain the static policy. Neither
+operation re-identifies or reconnects established clients. Unchanged effective
+policies preserve balances; finite transitions follow the existing settlement,
+freeze/resume, and no-refill rules. The local burst remains authoritative. When
+static accounts is absent, a dynamically finite account leaf defaults to
+`derp.MaxPacketSize` capacity rather than a zero-size burst.
+
+A response omission retains the identity's last overlay. New identities and a
+restarted process use static policy until their first valid allocation; the
+process does not persist its overlay. Timeouts, non-200 responses, and invalid
+responses retain the last valid overlay and leave data service running. A new
+boot rejected because of clock rollback therefore continues with static policy;
+a running process that already has an overlay retains that overlay on errors.
+Worker reports older than 90 seconds leave demand calculation but do not revoke
+local overlays or erase boot/seq fencing.
+
+Normal propagation aims for approximately 30–60 seconds, not a hard SLA. Cold
+start, new identities, budget changes, stale-node exclusion, recovery, and
+asynchronous handoff can exceed the global budget. During coordinator failure,
+excess can last indefinitely. This is the approved availability tradeoff, not a
+strict global bucket. Aggregate burst, device fairness, cross-layer optimal
+utilization, minimum bandwidth, and public-network throughput certification are
+not guaranteed. Direct traffic, Peer Relay, and nonparticipating DERPs remain
+outside the scope. All token holders share a trusted operations domain and can
+impersonate another whitelisted node; nodeId is not cryptographic isolation.
+
+To return to static mode after separate rollout approval, remove the coordinator
+startup flag and restart the intended process. SIGHUP or an empty response is not
+a mode switch. Disabling the Worker route alone leaves running nodes' last
+overlays in place. No production operation is authorized by this guide update.
+
+### Local verification evidence
+
+The supplied prior evidence records Worker typecheck, 327 unit tests, and 99
+runtime tests; Go four-package results of 167 top-level tests / 721 test nodes
+with three existing skips; and post-fix targeted 27/102 plus race results. This
+documentation update reruns no suite. The real joint run passed all 36 scenarios
+(the original 30 plus six coordinator scenarios) using two real binaries,
+production 30-second ticks, a Miniflare SQLite DO, and an HTTPS test CA. Each
+node received account rates of 65536 B/s in each direction, totaling R=131072
+B/s. It verified idle-share return to R, HTTP 503 retention and recovery, a real
+OS SIGHUP with six original connections retained, and a finite parent constraining
+an unlimited account. API concurrency tests are not OS-signal evidence.
+
+The joint run exposed a zero-burst drop when static accounts was absent; that
+case was fixed and reverified, with failure evidence retained. DO eviction/
+restoration and transaction rollback are established by runtime tests, not by
+the joint runner's temporary SQLite directory: its `durableObjectsPersist` was
+not consumed by the current Miniflare converter. These results do not certify
+public throughput. Dated evidence belongs in the new same-repository
+[Issue #17](https://github.com/WooDragon/derper-plus/issues/17), separate from the
+completed account task. Publication and production-adoption status are tracked
+in this repository's Issue #17 and host operations records. A later commit shall
+reference only the same-repository Issue number.
 
 ## Local verification and release boundary
 

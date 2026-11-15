@@ -219,7 +219,9 @@ func main() {
 		if err := s.LoadAndApplyTailnetRateConfig(*tailnetRateConfigPath); err != nil {
 			log.Fatalf("derper: loading tailnet rate config: %v", err)
 		}
-		go watchTailnetRateConfig(ctx, s, *tailnetRateConfigPath)
+		if err := startTailnetRateWatchers(ctx, s, *tailnetRateConfigPath); err != nil {
+			log.Fatalf("derper: starting tailnet rate lifecycle: %v", err)
+		}
 	} else if *userRateConfigPath != "" {
 		if !*verifyClients {
 			log.Fatal("derper: --user-rate-config requires --verify-clients=true")

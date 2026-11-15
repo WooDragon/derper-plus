@@ -1,12 +1,12 @@
 # ADR: Per-tailnet aggregate DERP payload rate limits
 
 - Date: 2026-11-12
-- Status: Accepted / Implemented and locally verified; plain-account v2 deployed and accepted in Chengdu on 2026-11-14 (see the deployment record below)
+- Status: Accepted / plain-account v2 adopted in Chengdu on 2026-11-14; optional coordinator implementation, local verification, and independent code review completed on 2026-11-15; publication and production-adoption status are tracked in this repository's Issue #17 and host operations records
 - Audience: DERP maintainers and admission-service implementers.
 
 ## Decision and authority
 
-This ADR specifies the wire contract, startup mode, policy selection, and
+This ADR specifies the admission wire contract, static startup mode, policy selection, and
 bucket lifecycle for per-tailnet aggregate policing. The local implementation,
 tests, and independent post-implementation review are complete. This status does
 not authorize deployment or claim a published release. Before configuring this
@@ -33,8 +33,9 @@ Upload means client to derper. Download means derper to client. A transfer
 within one tailnet shall consume that subject's upload once and download once.
 The policer counts DERP packet payload bytes, not wire overhead. It shall drop
 an over-budget payload immediately, rather than queue or shape it. It does not
-guarantee fairness among nodes, a total physical egress cap, or coordination
-across processes. Direct P2P, Peer Relay, and STUN are outside this policer.
+guarantee fairness among nodes or a total physical egress cap. The default
+static mode does not coordinate across processes; the optional increment below
+adds a global soft limit, not a strict global bucket. Direct P2P, Peer Relay, and STUN are outside this policer.
 
 The existing trusted-mesh exemption shall remain unchanged. Mesh forwarding
 shall not introduce a second upload charge at the receiving relay; delivery to
@@ -216,8 +217,10 @@ configuration and an unambiguous subject across all participating sources.
 Source mapping, cache validity, last-known-good snapshot adoption, and their
 availability and revocation tradeoffs belong to the admission service's design.
 This ADR does not define a second cache protocol or a global identity index.
-The local implementation is complete; rollout remains separate work. Cross-process buckets,
-CloudFront changes and site cutovers remain out of scope. The account increment
+The original local implementation is complete; rollout is separately authorized.
+The optional coordinator increment below extends the default per-process scope
+without introducing a strict cross-process bucket. CloudFront changes and site
+cutovers are not authorized by this ADR. The account increment
 below extends identity only through explicit v2 capability; it does not change
 default v1 identity or authorize a rollout.
 
@@ -387,7 +390,71 @@ O(parent buckets + account buckets), and the server lock remains held during
 application. The measured reload cost is accepted as nonblocking, not fixed;
 measurements belong to the dated issue, not a production pause guarantee. Other
 limits remain mutable/reused user strings, indefinite LKG revocation delay,
-connection-bound identity, and per-process rather than distributed quotas.
+connection-bound identity, and per-process quotas in the default static mode.
+The optional coordinator below adds only a distributed soft limit.
+
+## Cross-node dynamic global soft-limit decision (2026-11-15)
+
+Status: accepted, implemented, locally verified, and independently code-reviewed.
+Publication and production-adoption status are tracked in this repository's
+Issue #17 and host operations records.
+The existing account-v2 adoption in Chengdu is unchanged. This decision is not
+deployment approval and does not authorize publishing or creating cloud resources.
+
+> **Required reading:** Before changing or adopting coordination, read
+> `services/derp-admission-worker/README.md`, section “可选跨节点动态全局软限速”, in
+> [the personal-infra repository](https://github.com/WooDragon/personal-infra).
+> That README alone defines coordinator wire, HTTP, global configuration,
+> allocation, fencing, persistence, and errors. For Go startup configuration,
+> response validation, and lifecycle, read [the feature guide](derper-tailnet-qos.md).
+> After publication, use the corresponding release revision; repository links do
+> not imply a sibling filesystem layout.
+
+Participating self-operated DERPs report complete windows to one SQLite Durable
+Object, which recalculates demanded max-min allocations on each accepted report.
+Network parents and registering-account children are allocated independently in
+each direction. The design rejects static sharding and leaves admission identity,
+DERP wire, and client routing unchanged. Coordination defaults to disabled and
+adds no per-packet RPC or identity-API/KV query.
+
+Local static policy remains the hard upper bound and cold-start fallback. The
+effective policy intersects static and in-memory overlay: deny wins, unlimited
+acts as infinity, and finite rates take the minimum. Dynamic zero share is deny,
+not static rate 0. A finite parent still constrains an unlimited account. SIGHUP
+retains overlay, dynamic updates retain static policy, and neither operation
+refills burst or reconnects clients. A finite dynamic account without a static
+accounts leaf still has capacity for a legal maximum packet.
+
+Approximately 30–60 seconds is a normal propagation target, not a hard SLA.
+New identities and restarted processes initially use static limits. Omitted
+allocations and coordinator errors retain the last overlay. Cold starts, stale
+report exclusion, budget changes, recovery, and asynchronous handoff can exceed
+the global budget. Failure-period excess has no bounded duration: availability
+was explicitly preferred over strict global enforcement. Aggregate burst,
+cross-layer optimal utilization, device fairness, and minimum bandwidth are not
+guaranteed. Direct traffic, Peer Relay, and official or nonparticipating DERPs
+remain outside the scope.
+
+The shared admission token defines one trusted operations domain, not isolation
+between nodes: a holder can impersonate another whitelisted nodeId. Each nodeId
+shall have only one running instance. Clock rollback can reject a new boot under
+persistent fencing, leaving the new process on static policy. The design adds no
+lease, node certificate, account secret, or local overlay persistence file. The
+README distinguishes durable DO state from ephemeral local overlay; this ADR
+does not define a second recovery protocol.
+
+Prior real joint verification passed all 36 scenarios, including six coordinator
+scenarios with two real binaries, production reporting ticks, SQLite DO, and an
+HTTPS test CA. It covered shared allocations, idle-share return, 503 retention
+and recovery, actual OS SIGHUP with six original connections, and a finite parent
+constraining an unlimited account. Joint verification exposed the zero-burst
+case without static accounts; the fix was reverified and failure evidence kept.
+Runtime tests, not the joint runner's temporary directory, prove DO eviction/
+restoration. Dated counts and evidence belong in the feature guide and the new
+same-repository [Issue #17](https://github.com/WooDragon/derper-plus/issues/17).
+Publication and production-adoption status are tracked in this repository's
+Issue #17 and host operations records. This documentation update reruns no suite
+and does not certify public-network throughput.
 
 ## Acceptance coverage and delivery status
 

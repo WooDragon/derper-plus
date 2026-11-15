@@ -22,6 +22,7 @@ type tailnetRateBucket struct {
 	tokens        float64
 	last          time.Time
 	finiteHistory bool
+	coordinator   coordinatorCounters
 }
 
 // settle first compares time-to-fill, avoiding an overflowing duration product.
@@ -78,7 +79,10 @@ func (b *tailnetRateBucket) allow(size int, now time.Time) bool {
 	return true
 }
 
-type tailnetRateBuckets struct{ upload, download tailnetRateBucket }
+type tailnetRateBuckets struct {
+	upload, download  tailnetRateBucket
+	coordinatorActive bool
+}
 
 func (b *tailnetRateBuckets) update(policy tailnetRatePolicy, applicable, first bool, now time.Time) {
 	b.upload.update(policy.upload, policy.burst, applicable, first, now)
@@ -90,11 +94,12 @@ func (b *tailnetRateBuckets) update(policy tailnetRatePolicy, applicable, first 
 // The mutex linearizes admission, both directions, and complete reloads; no I/O
 // or callbacks other than the local clock occur while it is held.
 type tailnetRateRegistry struct {
-	mu       sync.Mutex
-	config   tailnetRateConfig
-	buckets  map[string]*tailnetRateBuckets
-	accounts map[tailnetAccountIdentity]*tailnetRateBuckets
-	now      func() time.Time
+	mu          sync.Mutex
+	config      tailnetRateConfig
+	buckets     map[string]*tailnetRateBuckets
+	accounts    map[tailnetAccountIdentity]*tailnetRateBuckets
+	now         func() time.Time
+	coordinator *coordinatorState
 }
 
 func newTailnetRateRegistry(cfg tailnetRateConfig, now func() time.Time) *tailnetRateRegistry {
@@ -122,11 +127,11 @@ func (r *tailnetRateRegistry) apply(cfg tailnetRateConfig) {
 	now := r.now()
 	for subject, buckets := range r.buckets {
 		policy, applicable := cfg.policyFor(subject)
-		buckets.update(policy, applicable, false, now)
+		r.updateCoordinatorBuckets(CoordinatorSubject{Kind: "network", Network: subject}, buckets, policy, applicable, false, now)
 	}
 	for id, buckets := range r.accounts {
 		policy, applicable := cfg.accountPolicyFor(id)
-		buckets.update(policy, applicable, false, now)
+		r.updateCoordinatorBuckets(CoordinatorSubject{Kind: "account", Network: id.network, Account: id.key}, buckets, policy, applicable, false, now)
 	}
 	r.config = cfg
 }
