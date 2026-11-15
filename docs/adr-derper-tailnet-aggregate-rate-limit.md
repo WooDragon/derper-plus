@@ -1,7 +1,7 @@
 # ADR: Per-tailnet aggregate DERP payload rate limits
 
 - Date: 2026-11-12
-- Status: Accepted / plain-account v2 adopted in Chengdu on 2026-11-14; optional coordinator implemented, locally verified and independently code-reviewed on 2026-11-15, uncommitted and unpublished, not deployed in production
+- Status: Accepted / plain-account v2 adopted in Chengdu on 2026-11-14; optional coordinator implementation, local verification, and independent code review completed on 2026-11-15; publication and production-adoption status are tracked in this repository's Issue #17 and host operations records
 - Audience: DERP maintainers and admission-service implementers.
 
 ## Decision and authority
@@ -396,8 +396,8 @@ The optional coordinator below adds only a distributed soft limit.
 ## Cross-node dynamic global soft-limit decision (2026-11-15)
 
 Status: accepted, implemented, locally verified, and independently code-reviewed.
-The coordinator code and documentation remain uncommitted and unpublished on
-`feature/derp-global-soft-rate`. Production coordinator deployment has not occurred.
+Publication and production-adoption status are tracked in this repository's
+Issue #17 and host operations records.
 The existing account-v2 adoption in Chengdu is unchanged. This decision is not
 deployment approval and does not authorize publishing or creating cloud resources.
 
@@ -407,9 +407,8 @@ deployment approval and does not authorize publishing or creating cloud resource
 > That README alone defines coordinator wire, HTTP, global configuration,
 > allocation, fencing, persistence, and errors. For Go startup configuration,
 > response validation, and lifecycle, read [the feature guide](derper-tailnet-qos.md).
-> The new material currently exists only on the local feature branch, not on the
-> remote default branch. After publication, use the corresponding release revision;
-> repository links do not imply a sibling filesystem layout.
+> After publication, use the corresponding release revision; repository links do
+> not imply a sibling filesystem layout.
 
 Participating self-operated DERPs report complete windows to one SQLite Durable
 Object, which recalculates demanded max-min allocations on each accepted report.
@@ -453,9 +452,9 @@ case without static accounts; the fix was reverified and failure evidence kept.
 Runtime tests, not the joint runner's temporary directory, prove DO eviction/
 restoration. Dated counts and evidence belong in the feature guide and the new
 same-repository [Issue #17](https://github.com/WooDragon/derper-plus/issues/17).
-That Issue remains OPEN because commit, publication, and production adoption
-have not occurred. This documentation update reruns no suite and does
-not certify public-network throughput.
+Publication and production-adoption status are tracked in this repository's
+Issue #17 and host operations records. This documentation update reruns no suite
+and does not certify public-network throughput.
 
 ## Acceptance coverage and delivery status
 

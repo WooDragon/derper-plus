@@ -235,22 +235,21 @@ writer-flood test-oracle defect is independently tracked in
 [Issue #13](https://github.com/WooDragon/derper-plus/issues/13); it is not fixed by
 this increment.
 
-## Optional cross-node coordinator (local implementation, not published)
+## Optional cross-node coordinator
 
 As of 2026-11-15, the two-repository implementation, required local verification,
-and independent code review are complete. The coordinator code and documentation
-remain uncommitted and unpublished on `feature/derp-global-soft-rate`. No
-production coordinator has been deployed. The existing Chengdu account-v2
-adoption above does not imply coordinator adoption or approve another rollout.
+and independent code review are complete. Publication and production-adoption
+status are tracked in this repository's Issue #17 and host operations records.
+The existing Chengdu account-v2 adoption above does not imply coordinator adoption
+or approve another rollout.
 
 > **Required reading:** Before configuring or changing the coordinator, read
 > `services/derp-admission-worker/README.md`, section “可选跨节点动态全局软限速”, in
 > [the personal-infra repository](https://github.com/WooDragon/personal-infra).
 > That README is the sole authority for coordinator wire fields, HTTP behavior,
-> global configuration, allocation, fencing, persistence, and errors. The new
-> content currently exists only on the local feature branch; the remote default
-> branch does not yet contain it. After publication, use the corresponding release
-> revision. Do not assume that the repositories are siblings on a deployed host.
+> global configuration, allocation, fencing, persistence, and errors. After
+> publication, use the corresponding release revision. Do not assume that the
+> repositories are siblings on a deployed host.
 
 ### Startup configuration
 
@@ -375,10 +374,10 @@ case was fixed and reverified, with failure evidence retained. DO eviction/
 restoration and transaction rollback are established by runtime tests, not by
 the joint runner's temporary SQLite directory: its `durableObjectsPersist` was
 not consumed by the current Miniflare converter. These results do not certify
-public throughput. Dated evidence and unpublished status belong in the new
-same-repository [Issue #17](https://github.com/WooDragon/derper-plus/issues/17),
-separate from the completed account task. That Issue remains OPEN: commit,
-publication, and production adoption have not occurred. A later commit shall
+public throughput. Dated evidence belongs in the new same-repository
+[Issue #17](https://github.com/WooDragon/derper-plus/issues/17), separate from the
+completed account task. Publication and production-adoption status are tracked
+in this repository's Issue #17 and host operations records. A later commit shall
 reference only the same-repository Issue number.
 
 ## Local verification and release boundary
